@@ -2,25 +2,20 @@ import json
 import re
 import os
 import numpy as np
-from data_util import UtilsFn
 
 
 class DataProvider(object):
-    def __init__(self,
-                 data_form,
-                 path='/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset',
-                 vocab_path='/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset/vocab.txt'):
+    def __init__(self, path, data_form):
         """
 
-        :param path: default : '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
+        :param path:
         :param data_form: 1 denotes x_batch shape: [batch_size, num_utterance, sequence_max_len, vocab_size]
                           2 denotes x_batch shape: [batch_size, num_all_word_in_dialog, vocab_size]
         """
-        self.path = path
+        self.path = path  # include file name
         self.batch_count = 0
-
+        self.vocabulary = []
         self.data = None
-        self.vocabulary = None
         self.ALREADY_LOAD_DATA = 0
         self.ALREADY_LOAD_VOCAB = 0
         self.sequence_max_len = 30
@@ -28,89 +23,58 @@ class DataProvider(object):
         self.max_num_words_in_dialog = 160
         self.shuffle_index = None
         self.data_form = data_form
-
-        self.TASK_ALREADY_SPECIFY = 0
-        self.CATEGORY_ALREADY_SPECIFY = 0
-
-        self.load_vocab(vocab_path)
         np.random.seed(1000)
 
     @property
-    def task1(self):
-        if not self.TASK_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'task1')
-            self.TASK_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('task\d', 'task1', self.path)
-        return self
-
-    @property
-    def task2(self):
-        if not self.TASK_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'task2')
-            self.TASK_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('task\d', 'task2', self.path)
-        return self
-
-    @property
     def train(self):
-        if not self.CATEGORY_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'train')
-            self.CATEGORY_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('tst\d|val', 'train', self.path)
-        return self
-
-    @property
-    def val(self):
-        if not self.CATEGORY_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'val')
-            self.CATEGORY_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('tst\d|train', 'val', self.path)
+        self.path = os.path.join(self.path, 'train')
         return self
 
     @property
     def test1(self):
-        if not self.CATEGORY_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'tst1')
-            self.CATEGORY_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('tst\d|train|val', 'tst1', self.path)
+        self.path = os.path.join(self.path, 'test/tst1')
         return self
 
     @property
     def test2(self):
-        if not self.CATEGORY_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'tst2')
-            self.CATEGORY_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('tst\d|train|val', 'tst2', self.path)
+        self.path = os.path.join(self.path, 'test/tst2')
         return self
 
     @property
     def test3(self):
-        if not self.CATEGORY_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'tst3')
-            self.CATEGORY_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('tst\d|train|val', 'tst3', self.path)
+        self.path = os.path.join(self.path, 'test/tst3')
         return self
 
     @property
     def test4(self):
-        if not self.CATEGORY_ALREADY_SPECIFY:
-            self.path = os.path.join(self.path, 'tst4')
-            self.CATEGORY_ALREADY_SPECIFY = 1
-        else:
-            self.path = re.sub('tst\d|train|val', 'tst4', self.path)
+        self.path = os.path.join(self.path, 'test/tst4')
         return self
 
-    def current_path(self):
-        print(self.path)
+    @property
+    def task1(self):
+        if self.path[-5:] == 'train':
+            self.path = os.path.join(self.path, 'dialog-task1API-kb1_atmosphere-distr0.5-trn10000.json')
+        elif self.path[-4:-1] == 'tst':
+            self.path = os.path.join(self.path, 'replaced_task1.json')
+        return self
 
-    def shuffle_data(self, data_size):
+    @property
+    def task2(self):
+        if self.path[-5:] == 'train':
+            self.path = os.path.join(self.path, 'dialog-task2REFINE-kb1_atmosphere-distr0.5-trn10000.json')
+        elif self.path[-4:-1] == 'tst':
+            self.path = os.path.join(self.path, 'replaced_task2.json')
+        return self
+
+    @property
+    def task4(self):
+        if self.path[-5:] == 'train':
+            self.path = os.path.join(self.path, 'dialog-task4INFOS-kb1_atmosphere-distr0.5-trn10000.json')
+        elif self.path[-4:-1] == 'tst':
+            self.path = os.path.join(self.path, 'replaced_task4.json')
+        return self
+
+    def shuffle_and_split_data(self, data_size):
         """
         Generate a shuffled index given data size
         :param data_size:
@@ -285,8 +249,7 @@ class DataProvider(object):
 
         # read data
         if not self.ALREADY_LOAD_DATA:
-            json_file = os.path.join(self.path, os.listdir(self.path)[0])
-            with open(json_file) as f:
+            with open(self.path) as f:
                 self.data = json.load(f)
                 self.ALREADY_LOAD_DATA = 1
 
@@ -326,7 +289,7 @@ class DataProvider(object):
                                  pad=True,
                                  max_len=1)
 
-                y_batch.append(y[0])
+                y_batch.append(y)
 
             # --------------- x batch data ----------------- #
             if self.data_form == 1:
@@ -394,24 +357,20 @@ class DataProvider(object):
         else:
             self.batch_count = self.batch_count + 1
 
-        # y_batch = [y[0] for y in y_batch]
+        y_batch = [y[0] for y in y_batch]
         return x_batch, y_batch
 
     @property
     def answer_category(self):
         with open('/afs/inf.ed.ac.uk/'
-                  'user/s17/s1700619/E2E_dialog/my_dataset/task1_answer_category.txt', 'r') as f:
+                  'user/s17/s1700619/E2E_dialog/dataset/task1_answer_category.txt', 'r') as f:
             ans = f.readlines()
         return [line[:-1] for line in ans]
 
-    @staticmethod
-    def one_hot(list_of_index, vocab_size=None, pad=False, max_len=None):
+    def one_hot(self, list_of_index, vocab_size=None, pad=False, max_len=None):
         """
         Making one-hot encoding and padding (optional) for a sequence of indices
         :param list_of_index: a list of word index in vocabulary, e.g. [1, 3, 0]
-        :param vocab_size:
-        :param pad:
-        :param max_len:
         :return: a list of one-hot form indices e.g. [[0, 1, 0, 0]  # 1
                                                       [0, 0, 0, 1]  # 3
                                                       [1, 0, 0, 0]  # 0
@@ -453,16 +412,53 @@ class DataProvider(object):
 
 
 if __name__ == '__main__':
-    DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
+    DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset'
 
     data_provider = DataProvider(path=DATA_PATH, data_form=2)
+    # get train data
+    x, y = data_provider.train.task4.next_batch(10, data_type='word')
+    # get test data
+    x_test, y_test = data_provider.test2.task1.next_batch(10, data_type='word')
 
-    x, y = data_provider.task1.train.next_batch(100, data_type='one_hot', label_type='one_hot')
-    data_provider.task2.train.current_path()
-    data_provider.task1.test1.current_path()
-    xx, yy = data_provider.task2.val.next_batch(10)
+    # first_utterance = x[0][0]
+    # first_word_in_first_utterance = first_utterance[0]
 
-    # a = re.sub('a|bc', '!!', '0000000a0bc00')
-    # print(a)
+    # feed_x_shape = np.array(x).shape
+    #
+    # # data information
+    # count0 = data_provider.train.task1.batch_count
+    # vocab_size = data_provider.vocab_size
+    # data_size = len(data_provider.data)
+
+    # data_provider.create_vocab('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/')
+
+    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst1/task2.json')
+    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst2/task2.json')
+    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst3/task2.json')
+    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst4/task2.json')
+
+    # create answer category file
+    # train_answer_category = []
+    #
+    # for i in range(10000):
+    #     _, y = data_provider.train.task1.next_batch(1)
+    #     if y[0][0:8] == 'api_call':
+    #         y = ['api_call']
+    #     if y not in train_answer_category:
+    #         train_answer_category.append(y)
+    #
+    # test_answer_category = []
+    #
+    # for i in range(1000):
+    #     _, y = data_provider.test1.task1.next_batch(1)
+    #     if y[0][0:8] == 'api_call':
+    #         y = ['api_call']
+    #     if y not in test_answer_category:
+    #         test_answer_category.append(y)
+    #
+    # answer_category = test_answer_category
+    # with open('../dataset/task1_answer_category.txt', 'w') as f:
+    #     for answer in answer_category:
+    #         f.writelines(answer[0] + '\n')
 
     pass

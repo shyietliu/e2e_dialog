@@ -6,9 +6,9 @@ import logger
 
 class AttnNet(E2EModel):
     def __init__(self, data_path, task_num, data_form=2):
-        super(AttnNet, self).__init__(data_path, task_num, data_form)
+        super(AttnNet, self).__init__(task_num, data_form)
         self.hidden_unit_num = 2048
-        self.output_dim = 19
+        self.output_dim = 20
         self.path = data_path
 
     @staticmethod
@@ -17,13 +17,14 @@ class AttnNet(E2EModel):
         alignment = tf.nn.softmax(align_matrix, 0)
         context_vector = tf.matmul(x, alignment)
         attention_output = tf.layers.dense(tf.reshape(tf.concat([x, context_vector], 1),
-                                                      [-1, 2 * 160 * 181]),  # was 160*128
+                                                      [-1, 2 * 160 * 188]),
                                            1024,
                                            activation=tf.nn.tanh)
         return attention_output
 
     def attention_network(self, x):
 
+        # embed_x = self.embedding_layer(x)
         context_matrix = self.self_attention(x, attn_output_dim=1024)
         ff = tf.layers.dense(context_matrix, 512, tf.nn.relu)
         # hidden = self.attention_layer(hidden, attn_output_dim=2048)
@@ -34,8 +35,8 @@ class AttnNet(E2EModel):
     def train(self, epochs, exp_name, lr=1e-3, save_model=False):
 
         # inputs & outputs format
-        x = tf.placeholder(tf.float32, [None, 160, 181], name='x')
-        y = tf.placeholder('float', [None, 19], name='y')
+        x = tf.placeholder(tf.float32, [None, 160, 188], name='x')
+        y = tf.placeholder('float', [None, self.output_dim], name='y')
 
         # construct computation graph
         logits = self.attention_network(x)
@@ -50,32 +51,31 @@ class AttnNet(E2EModel):
             init = tf.global_variables_initializer()
             sess.run(init)
 
-            dstc_data = data_provider.DataProvider(self.path, data_form=2)
             log_saver = logger.LogSaver(exp_name)
-            log_saver.set_log_cate('task1')
+            log_saver.set_log_cate(self.task_num)
 
             # train
             for epoch in range(epochs):
-                batch_x, batch_y = dstc_data.train.task1.next_batch(100)
+                batch_x, batch_y = self.train_set.next_batch(100)
                 sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
                 # validating
-                if epoch % 10 == 0:
+                if epoch % 10 == 0 and epoch != 0:
                     train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
 
-                    val_x, val_y = dstc_data.test2.task1.next_batch(100)
+                    val_x, val_y = self.val_set.next_batch(1000)
                     val_acc = accuracy.eval(feed_dict={
                         x: val_x,
                         y: val_y})
                     print('Training {0} epoch, validation accuracy is {1}, training loss is {2}'.format(epoch,
                                                                                                         val_acc,
                                                                                                         train_loss))
-                    # save train process
+
                     log_saver.train_process_saver([epoch, train_loss, val_acc])
 
             # evaluate
             for index, test_set in enumerate(self.test_sets):
-                if index>0:
+                if index > 0:
                     test_x, test_y = test_set.next_batch(100)
                     test_acc = sess.run(
                         accuracy, feed_dict={
@@ -93,8 +93,8 @@ class AttnNet(E2EModel):
 if __name__ == '__main__':
     DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset'
 
-    model = AttnNet(DATA_PATH)
-    model.train(10, 'test_save_model')
+    model = AttnNet(DATA_PATH, 1)
+    model.train(100, 'test_save_model')
     pass
 
 

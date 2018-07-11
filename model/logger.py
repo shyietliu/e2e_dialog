@@ -46,9 +46,10 @@ class LogSaver(object):
         if not os.path.exists(self.log_path):
             os.makedirs(self.log_path)
         with open(self.file_path, 'a') as f:
-            print('Epoch,{0}, Train loss,{1}, Val_acc,{2}'.format(information[0],
-                                                                  information[1],
-                                                                  information[2]), file=f)
+            print('Epoch, {0}, Train loss,{1:4f}, Train acc, {2:4f}, Val_acc,{3:4f}'.format(information[0],
+                                                                                            information[1],
+                                                                                            information[2],
+                                                                                            information[3]), file=f)
 
     def test_result_saver(self, information, test_set_index):
         if not os.path.exists(self.log_path):

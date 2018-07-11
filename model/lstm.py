@@ -3,6 +3,7 @@ import data_provider
 import logger
 import argparse
 from E2E_model import E2EModel
+import tqdm
 
 
 class LSTM(E2EModel):
@@ -17,6 +18,7 @@ class LSTM(E2EModel):
 
     def bd_lstm_predictor(self, x):
 
+        # lstm network
         fw_lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.lstm_hidden_unit_num, forget_bias=1, activation=tf.nn.relu)
         bw_lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.lstm_hidden_unit_num, forget_bias=1, activation=tf.nn.relu)
 
@@ -26,9 +28,15 @@ class LSTM(E2EModel):
                                                                    dtype="float32",
                                                                    sequence_length=self.length(x))
 
-        ff_inputs = tf.concat([last_state[0].h, last_state[1].h], 1)
-        #
-        ff_outputs = tf.layers.dense(ff_inputs, 512, tf.nn.relu)
+        concated_last_state = tf.concat([last_state[0].h, last_state[1].h], 1)
+
+        # attention (optional)
+        if self.attn_usage:
+            output = self.attention_layer(concated_last_state)
+        else:
+            output = concated_last_state
+
+        ff_outputs = tf.layers.dense(output, 512, tf.nn.relu)
 
         logits = tf.layers.dense(ff_outputs, self.output_dim)
 
@@ -56,19 +64,21 @@ class LSTM(E2EModel):
 
     def train(self, epochs, exp_name, lr, save_model=False):
 
-        print(save_model)
+        print('Save model status: ', save_model)
         # inputs & outputs format
-        x = tf.placeholder(tf.float32, [None, 160, 188])
+        x = tf.placeholder(tf.int32, [None, 180])
         y = tf.placeholder('float', [None, self.output_dim])
 
         self.learning_rate = lr
         self.epochs = epochs
 
+        embed_x = self.embedding_layer(x)
+
         # construct computation graph
         if self.bidirection:
-            pred = self.bd_lstm_predictor(x)
+            pred = self.bd_lstm_predictor(embed_x)
         else:
-            pred = self.lstm_predictor(x)
+            pred = self.lstm_predictor(embed_x)
 
         loss = self.compute_loss(pred, y)
 
@@ -81,32 +91,45 @@ class LSTM(E2EModel):
             init = tf.global_variables_initializer()
             sess.run(init)
 
+            # ini logger
             log_saver = logger.LogSaver(exp_name)
             log_saver.set_log_cate(self.task_num)
 
             # train
             for epoch in range(epochs):
-                batch_x, batch_y = self.train_set.next_batch(100)
-                sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
+                for i in range(int(8000/100)):
+                    batch_x, batch_y = self.train_set.next_batch(100)
+                    sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
-                # validating
-                if epoch % 10 == 0 and epoch != 0:
-                    train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                    # print validation information every 10 iteration
+                    if i % 10 == 0 and i != 0:
+                        train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                        train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
 
-                    val_x, val_y = self.val_set.next_batch(100)
-                    val_acc = accuracy.eval(feed_dict={
-                                    x: val_x,
-                                    y: val_y})
-                    print('Training {0} epoch, validation accuracy is {1}, training loss is {2}'.format(epoch,
-                                                                                                        val_acc,
-                                                                                                        train_loss))
+                        val_x, val_y = self.val_set.next_batch(1000)
+                        val_acc = accuracy.eval(feed_dict={
+                                        x: val_x,
+                                        y: val_y})
+                        print('Epoch, {0}, Train loss,{1:2f}, Train acc, {2:3f}, Val_acc,{3:3f}'.format(epoch,
+                                                                                                        train_loss,
+                                                                                                        train_acc,
+                                                                                                        val_acc))
 
-                    log_saver.train_process_saver([epoch, train_loss, val_acc])
+                # save evaluation result per epoch
+                train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
 
-            # evaluate
+                val_x, val_y = self.val_set.next_batch(1000)
+                val_acc = accuracy.eval(feed_dict={
+                    x: val_x,
+                    y: val_y})
+
+                log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
+
+            # evaluate after training
             for index, test_set in enumerate(self.test_sets):
                 if index > 0:
-                    test_x, test_y = test_set.next_batch(100)
+                    test_x, test_y = test_set.next_batch(1000)
                     test_acc = sess.run(
                         accuracy, feed_dict={
                             x: test_x,
@@ -119,34 +142,8 @@ class LSTM(E2EModel):
             if save_model:
                 log_saver.model_saver(sess)
 
-    @property
-    def name(self):
-
-        model_name = self.__class__.__name__
-        attn_name = self.attn_usage
-        bd_name = self.bidirection
-        lr_name = self.learning_rate
-        epoch_name = self.epochs
-        ll = [model_name, attn_name, bd_name, lr_name, epoch_name]
-        print('_'.join(str(ll)))
-        return 'test'
-
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Train BidirectionalLSTM saved_model')
-    parser.add_argument('-exp_name', dest='exp_name')
-    parser.add_argument('-train_epoch', dest='train_epoch', type=int)
-    parser.add_argument('-lr', dest='learning_rate', type=float)
-
-    args = parser.parse_args()
-
-    DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset'
-
-    model = LSTM(DATA_PATH)
-    train_epoch = args.train_epoch
-    learning_rate = args.learning_rate
-    exp_name = args.exp_name+'_'+str(train_epoch)+'_lr_'+str(learning_rate)
-    model.train(train_epoch, exp_name, learning_rate)
     pass
 

@@ -2,20 +2,26 @@ import json
 import re
 import os
 import numpy as np
+from data_util import UtilsFn
 
 
 class DataProvider(object):
-    def __init__(self, path, data_form):
+    def __init__(self,
+                 data_form,
+                 path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset',
+                 vocab_path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/_glove_vocab.txt'):
         """
 
-        :param path:
+        :param path: default : '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
         :param data_form: 1 denotes x_batch shape: [batch_size, num_utterance, sequence_max_len, vocab_size]
                           2 denotes x_batch shape: [batch_size, num_all_word_in_dialog, vocab_size]
         """
-        self.path = path  # include file name
+        self.path = path
+        self.vocab_path = vocab_path
         self.batch_count = 0
-        self.vocabulary = []
+
         self.data = None
+        self.vocabulary = None
         self.ALREADY_LOAD_DATA = 0
         self.ALREADY_LOAD_VOCAB = 0
         self.sequence_max_len = 30
@@ -23,58 +29,101 @@ class DataProvider(object):
         self.max_num_words_in_dialog = 160
         self.shuffle_index = None
         self.data_form = data_form
+
+        self.TASK_ALREADY_SPECIFY = 0
+        self.CATEGORY_ALREADY_SPECIFY = 0
+        self.PREVIOUS_BATCH_SIZE = None
+
+        self.load_vocab(vocab_path)
         np.random.seed(1000)
 
     @property
-    def train(self):
-        self.path = os.path.join(self.path, 'train')
-        return self
-
-    @property
-    def test1(self):
-        self.path = os.path.join(self.path, 'test/tst1')
-        return self
-
-    @property
-    def test2(self):
-        self.path = os.path.join(self.path, 'test/tst2')
-        return self
-
-    @property
-    def test3(self):
-        self.path = os.path.join(self.path, 'test/tst3')
-        return self
-
-    @property
-    def test4(self):
-        self.path = os.path.join(self.path, 'test/tst4')
-        return self
-
-    @property
     def task1(self):
-        if self.path[-5:] == 'train':
-            self.path = os.path.join(self.path, 'dialog-task1API-kb1_atmosphere-distr0.5-trn10000.json')
-        elif self.path[-4:-1] == 'tst':
-            self.path = os.path.join(self.path, 'replaced_task1.json')
+        if not self.TASK_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'task1')
+            self.TASK_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('task\d', 'task1', self.path)
         return self
 
     @property
     def task2(self):
-        if self.path[-5:] == 'train':
-            self.path = os.path.join(self.path, 'dialog-task2REFINE-kb1_atmosphere-distr0.5-trn10000.json')
-        elif self.path[-4:-1] == 'tst':
-            self.path = os.path.join(self.path, 'replaced_task2.json')
+        if not self.TASK_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'task2')
+            self.TASK_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('task\d', 'task2', self.path)
         return self
 
     @property
-    def task4(self):
-        if self.path[-5:] == 'train':
-            self.path = os.path.join(self.path, 'dialog-task4INFOS-kb1_atmosphere-distr0.5-trn10000.json')
-        elif self.path[-4:-1] == 'tst':
-            self.path = os.path.join(self.path, 'replaced_task4.json')
+    def train(self):
+        if not self.CATEGORY_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'train')
+            self.CATEGORY_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('tst\d|val', 'train', self.path)
         return self
 
-    def shuffle_and_split_data(self, data_size):
+    @property
+    def val(self):
+        if not self.CATEGORY_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'val')
+            self.CATEGORY_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('tst\d|train', 'val', self.path)
+        return self
+
+    @property
+    def test1(self):
+        if not self.CATEGORY_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'tst1')
+            self.CATEGORY_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('tst\d|train|val', 'tst1', self.path)
+        return self
+
+    @property
+    def test2(self):
+        if not self.CATEGORY_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'tst2')
+            self.CATEGORY_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('tst\d|train|val', 'tst2', self.path)
+        return self
+
+    @property
+    def test3(self):
+        if not self.CATEGORY_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'tst3')
+            self.CATEGORY_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('tst\d|train|val', 'tst3', self.path)
+        return self
+
+    @property
+    def test4(self):
+        if not self.CATEGORY_ALREADY_SPECIFY:
+            self.path = os.path.join(self.path, 'tst4')
+            self.CATEGORY_ALREADY_SPECIFY = 1
+        else:
+            self.path = re.sub('tst\d|train|val', 'tst4', self.path)
+        return self
+
+    def current_path(self):
+        print(self.path)
+
+    @staticmethod
+    def clean_data(sent):
+        sent = re.sub(',', ' ,', sent)
+        sent = re.sub('\.', ' .', sent)
+        sent = re.sub('\'m', ' \'m', sent)
+        sent = re.sub('\'re', ' \'re', sent)
+        sent = re.sub('\'s', ' \'s', sent)
+        sent = re.sub('\'d', ' \'d', sent)
+        sent = re.sub('n\'t', ' n\'t', sent)
+        return sent
+
+    def shuffle_data(self, data_size):
         """
         Generate a shuffled index given data size
         :param data_size:
@@ -85,8 +134,9 @@ class DataProvider(object):
     def pre_process(self, vocab_path):
         """
         Clean data and Create a vocabulary, save them to $vocab_path$
-        Only create vocab from task1 training set.
+        Only create vocab from one task training set.
         """
+        self.vocabulary = []
 
         # read data file
         with open(self.path) as f:
@@ -96,9 +146,15 @@ class DataProvider(object):
         for data_piece in self.data:
             dialog = data_piece['utterances']
             for sent in dialog:
+                sent = re.sub(',', ' ,', sent)
+                sent = re.sub('\.', ' .', sent)
+                sent = re.sub('\'m', ' \'m', sent)
+                sent = re.sub('\'re', ' \'re', sent)
+                sent = re.sub('\'s', ' \'s', sent)
+                sent = re.sub('\'d', ' \'d', sent)
+                sent = re.sub('n\'t', ' n\'t', sent)
                 word_list = str(sent).split()
                 for word in word_list:
-                    word = re.sub('[,.]', '', word)
                     if word not in self.vocabulary:
                         self.vocabulary.append(word)
 
@@ -118,6 +174,7 @@ class DataProvider(object):
         :param vocab_path: exclude file name.
         :return:
         """
+        vocabulary = []
 
         data_tasks_path = [
             '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/train/dialog-task1API-kb1_atmosphere-distr0.5-trn10000.json',
@@ -150,20 +207,27 @@ class DataProvider(object):
                     if sent[0:14] == 'the option was':
                         sent = 'the option was'
 
-                    word_list = str(sent).split()
+                    sent = re.sub(',', ' ,', sent)
+                    sent = re.sub('\.', ' .', sent)
+                    sent = re.sub('\'m', ' \'m', sent)
+                    sent = re.sub('\'re', ' \'re', sent)
+                    sent = re.sub('\'s', ' \'s', sent)
+                    sent = re.sub('\'d', ' \'d', sent)
+                    sent = re.sub('n\'t', ' n\'t', sent)
+
+                    word_list = str(sent).split(' ')
                     for word in word_list:
-                        word = re.sub('[,.]', '', word)
-                        if word not in self.vocabulary:
-                            self.vocabulary.append(word)
+                        if word not in vocabulary:
+                            vocabulary.append(word)
 
         # save vocabulary
-        v_file_name = 'vocab.txt'
+        v_file_name = '_glove_vocab.txt'
 
         if not os.path.exists(vocab_path):
             os.makedirs(vocab_path)
 
         with open(vocab_path + v_file_name, 'w') as f:
-            for item in self.vocabulary:
+            for item in vocabulary:
                 print(item, file=f)
 
     def replace_oov(self, oov_data_path):
@@ -230,7 +294,7 @@ class DataProvider(object):
         return np.array(padded_seq)
 
     def next_batch(self, batch_size,
-                   data_type='one_hot',
+                   data_type='index',
                    label_type='one_hot'):
         """
         get batch data
@@ -239,6 +303,10 @@ class DataProvider(object):
                  if data_type = index, return word index in the vocab
                  if data_type = word,  return raw words.
         """
+        if self.PREVIOUS_BATCH_SIZE != batch_size:
+            self.batch_count = 0
+            self.PREVIOUS_BATCH_SIZE = batch_size
+
         # load vocabulary
         if not self.ALREADY_LOAD_VOCAB:
             if os.path.isfile('../dataset/vocab_task1_only.txt'):
@@ -249,12 +317,15 @@ class DataProvider(object):
 
         # read data
         if not self.ALREADY_LOAD_DATA:
-            with open(self.path) as f:
+            json_file = os.path.join(self.path, os.listdir(self.path)[0])
+            with open(json_file) as f:
                 self.data = json.load(f)
                 self.ALREADY_LOAD_DATA = 1
 
         data_size = len(self.data)  # the size of training data
+
         total_num_batch = int(data_size / batch_size)  # the number of batches
+        print(total_num_batch)
 
         # # shuffle data
         if self.shuffle_index is None:
@@ -264,7 +335,7 @@ class DataProvider(object):
         x_batch = []
         y_batch = []
         # for each data pair in a batch
-        for index in range(self.batch_count*batch_size, self.batch_count*batch_size+batch_size):
+        for index in range(self.batch_count*batch_size, (self.batch_count+1)*batch_size):
             x = self.data[self.shuffle_index[index]]['utterances']  # list, each element is an utterance (string)
             y = self.data[self.shuffle_index[index]]['answer']['utterance']  # string, the correct candidate
 
@@ -289,7 +360,7 @@ class DataProvider(object):
                                  pad=True,
                                  max_len=1)
 
-                y_batch.append(y)
+                y_batch.append(y[0])
 
             # --------------- x batch data ----------------- #
             if self.data_form == 1:
@@ -298,13 +369,13 @@ class DataProvider(object):
                     # y_batch.append(y)
                 elif data_type == 'index' or data_type == 'one_hot':
                     dialog = []
-                    # answer = None
                     if data_type == 'index':
                         for utterance in x:
-                            utterance = re.sub('[,.?!]', '', utterance)
-                            # words in each utterance, list of strings
-                            dialog.append([self.word2idx(ele) for ele in utterance.split()])
-                            # answer = [self.word2idx(ele) for ele in y.split()]
+                            utterance = self.clean_data(utterance)
+                            # append words in each utterance, list of strings
+                            words_index = [self.word2idx(ele) for ele in utterance.split()]
+                            dialog.append(np.pad(words_index, (0, 30 - len(words_index)), 'constant').tolist())
+
                     elif data_type == 'one_hot':
                         for i in range(self.max_num_utterance):
                             if i < len(x):
@@ -318,7 +389,7 @@ class DataProvider(object):
                                 dialog.append(np.zeros([self.sequence_max_len, self.vocab_size]).tolist())
                         # answer = self.one_hot([self.word2idx(ele) for ele in y.split()])
 
-                    x_batch.append(dialog)
+                    x_batch.append(dialog + np.zeros([(25 - len(dialog)), 30]).tolist())
                     # y_batch.append(answer)
                 else:
                     raise Exception('data_type must be \'word\' or \'index\' or \'one_hot\'!')
@@ -328,13 +399,16 @@ class DataProvider(object):
                 if data_type == 'word':
                     x_batch.append(x)
                 elif data_type == 'index':
+                    dialog = []
                     for utterance in x:
-                        utterance = re.sub('[,.?!]', '', utterance)
+                        utterance = self.clean_data(utterance)
                         # words in each utterance, list of strings
-                        for word in utterance.split():
-                            x_batch.append(self.word2idx(word))
+                        dialog += [self.word2idx(ele) for ele in utterance.split()]
+                    padded_dialog = np.pad(dialog, (0, 180 - len(dialog)), 'constant')
+                    x_batch.append(padded_dialog.tolist() + [np.zeros([(25-len(padded_dialog)), 1]).tolist()])
 
                 elif data_type == 'one_hot':
+                    raise Exception('not implement')
                     dialog = []
                     for utterance in x:
                         utterance = re.sub('[,.?!]', '', utterance)
@@ -351,26 +425,63 @@ class DataProvider(object):
 
                 else:
                     raise Exception('data_type must be \'word\' or \'index\' or \'one_hot\'!')
-
+        print(self.batch_count)
         if self.batch_count == total_num_batch-1:
             self.batch_count = 0  # reset count
         else:
             self.batch_count = self.batch_count + 1
+        print(self.batch_count)
 
-        y_batch = [y[0] for y in y_batch]
+        # if self.data_form == 1:
+        #     # padding to 25 utterances each dialog
+        #     x_batch = x_batch
         return x_batch, y_batch
 
     @property
     def answer_category(self):
-        with open('/afs/inf.ed.ac.uk/'
-                  'user/s17/s1700619/E2E_dialog/dataset/task1_answer_category.txt', 'r') as f:
+        with open('../my_dataset/task1_answer_category.txt', 'r') as f:
             ans = f.readlines()
         return [line[:-1] for line in ans]
 
-    def one_hot(self, list_of_index, vocab_size=None, pad=False, max_len=None):
+    def select_embedding(self, raw_embedding_file, output_embedding_file):
+        """
+        Select a sub-embedding which is consistent with the vocabulary from the raw embedding file
+        :param raw_embedding_file: the entire embedding file path
+        :param output_embedding_file:  the output file that storage the sub-embedding
+        :return: None
+        """
+
+        self.load_vocab(self.vocab_path)
+
+        with open(raw_embedding_file) as f:
+            entire_embedding = f.readlines()
+
+        disorder_sub_embedding = []
+
+        for word_embedding in entire_embedding:
+            term = word_embedding.split(' ')
+            word = term[0]
+            if word in self.vocabulary:
+                disorder_sub_embedding.append(word_embedding)
+
+        sub_embedding = []
+        for word in self.vocabulary:
+            for embed in disorder_sub_embedding:
+                if embed.split(' ')[0] == word:
+                    sub_embedding.append(embed)
+
+        with open(output_embedding_file, 'w') as f:
+            for ele in sub_embedding:
+                f.write(ele)
+
+    @staticmethod
+    def one_hot(list_of_index, vocab_size=None, pad=False, max_len=None):
         """
         Making one-hot encoding and padding (optional) for a sequence of indices
         :param list_of_index: a list of word index in vocabulary, e.g. [1, 3, 0]
+        :param vocab_size:
+        :param pad:
+        :param max_len:
         :return: a list of one-hot form indices e.g. [[0, 1, 0, 0]  # 1
                                                       [0, 0, 0, 1]  # 3
                                                       [1, 0, 0, 0]  # 0
@@ -394,8 +505,14 @@ class DataProvider(object):
 
     def load_vocab(self, vocab_path):
         """Load vocabulary"""
-        with open(vocab_path, 'r') as f:
-            self.vocabulary = f.read().splitlines()
+
+        if not self.ALREADY_LOAD_VOCAB:
+            with open(vocab_path, 'r') as f:
+                self.vocabulary = f.read().splitlines()
+            self.ALREADY_LOAD_VOCAB = 1
+            print('Vocabulary loaded.')
+        else:
+            print('Vocabulary already loaded.')
 
     def word2idx(self, word):
         """Convert word to index"""
@@ -412,53 +529,30 @@ class DataProvider(object):
 
 
 if __name__ == '__main__':
-    DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset'
+    DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
 
-    data_provider = DataProvider(path=DATA_PATH, data_form=2)
-    # get train data
-    x, y = data_provider.train.task4.next_batch(10, data_type='word')
-    # get test data
-    x_test, y_test = data_provider.test2.task1.next_batch(10, data_type='word')
+    # data_provider = DataProvider(data_form=2, path='/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset/task1/train/train_data.json')
+    data_provider = DataProvider(data_form=1)
+    # data_provider.select_embedding('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/glove.6B.300d.txt', '../my_dataset/sub_glove_embedding.txt')
 
-    # first_utterance = x[0][0]
-    # first_word_in_first_utterance = first_utterance[0]
+    # data_provider.create_vocab('../my_dataset/')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    x, y = data_provider.task1.val.next_batch(1000, data_type='index', label_type='word')
+    # x2, y2 = data_provider.task2.train.next_batch(1, data_type='index', label_type='word')
+    # x3, y3 = data_provider.task2.train.next_batch(1, data_type='index', label_type='word')
+    # data_provider.task2.train.current_path()
+    # data_provider.task1.test1.current_path()
+    # xx, yy = data_provider.task2.val.next_batch(10)
 
-    # feed_x_shape = np.array(x).shape
-    #
-    # # data information
-    # count0 = data_provider.train.task1.batch_count
-    # vocab_size = data_provider.vocab_size
-    # data_size = len(data_provider.data)
-
-    # data_provider.create_vocab('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/')
-
-    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst1/task2.json')
-    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst2/task2.json')
-    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst3/task2.json')
-    # data_provider.replace_oov('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst4/task2.json')
-
-    # create answer category file
-    # train_answer_category = []
-    #
-    # for i in range(10000):
-    #     _, y = data_provider.train.task1.next_batch(1)
-    #     if y[0][0:8] == 'api_call':
-    #         y = ['api_call']
-    #     if y not in train_answer_category:
-    #         train_answer_category.append(y)
-    #
-    # test_answer_category = []
-    #
-    # for i in range(1000):
-    #     _, y = data_provider.test1.task1.next_batch(1)
-    #     if y[0][0:8] == 'api_call':
-    #         y = ['api_call']
-    #     if y not in test_answer_category:
-    #         test_answer_category.append(y)
-    #
-    # answer_category = test_answer_category
-    # with open('../dataset/task1_answer_category.txt', 'w') as f:
-    #     for answer in answer_category:
-    #         f.writelines(answer[0] + '\n')
+    # a = re.sub('a|bc', '!!', '0000000a0bc00')
+    # print(a)
 
     pass

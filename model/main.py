@@ -9,14 +9,14 @@ FLAGS = tf.app.flags.FLAGS
 DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
 tf.app.flags.DEFINE_string('data_path', DATA_PATH, "training data dir")
 tf.app.flags.DEFINE_integer('epoch', 1000, "Training epochs")
-tf.app.flags.DEFINE_float('lr', 1e-3, "Learning rate")
+tf.app.flags.DEFINE_float('lr', 1e-4, "Learning rate")
 tf.app.flags.DEFINE_boolean('train', True, 'Training status')
 tf.app.flags.DEFINE_string('exp_name', 'name', 'experiment name')
 tf.app.flags.DEFINE_boolean('save_model', False, 'save model or not')
 
 if __name__ == '__main__':
     model_name = 'MLP_attn_lr_1e-3_epoch_1000'
-    model = LSTM(task_num=1)
+    model = HierarchicalLSTM(task_num=1)
 
     if FLAGS.exp_name == 'default':
         exp_name = model_name
@@ -29,3 +29,10 @@ if __name__ == '__main__':
                 save_model=FLAGS.save_model)
     # task = 1,2,3,4,5
     # test = 1, 2, 3, 4
+
+
+# utterance = re.sub('!', '', utterance)
+#                             utterance = re.sub(',', ' ,', utterance)
+#                             utterance = re.sub('\.', ' .', utterance)
+#                             utterance = re.sub('\?', ' ?', utterance)
+#                             utterance = re.sub('\'', ' \'', utterance)

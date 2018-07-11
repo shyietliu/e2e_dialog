@@ -1,5 +1,5 @@
 import tensorflow as tf
-import data_provider_2
+import data_provider
 from E2E_model import E2EModel
 import logger
 

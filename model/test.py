@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import data_provider
+import copy
 
 
 def reform_test_data(test_data_path, test_answer_path, reformed_data_saved_path):
@@ -66,14 +67,28 @@ def count_answer_category(file_path, saved_path):
 
 
 if __name__ == '__main__':
-    with open('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/test/tst4/task1.json', 'r') as f:
-        train_data = json.load(f)
+    # with open('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset/task1/val/val_data.json', 'r') as f:
+    #     train_data = json.load(f)
+    #
+    # for dialog in train_data:
+    #     answer = dialog['answer']['utterance']
+    #     # if answer[0:2] == 'do':
+    #     print(answer)
+    #
+    # with open('../my_dataset/sub_glove_embedding.txt', 'a') as f:
+    #     a = np.round(np.zeros([1, 300]), decimals=5).tolist()
+    #
+    #     for ele in a:
+    #         for v in ele:
+    #             f.write(' '+str(v))
+    #         f.write('\n')
 
-    for dialog in train_data:
-        answer = dialog['answer']['utterance']
-        # if answer[0:2] == 'do':
-        print(answer)
-
-
-
+    # dp = data_provider.DataProvider(1)
+    #
+    # train = copy.deepcopy(dp.task1.train)
+    # val = copy.deepcopy(dp.task1.val)
+    # #
+    # train.current_path()
+    # val.current_path()
+    print(np.pad([1,2,3], (0, 10 - len([1,2,3])), 'constant'))
     pass
