@@ -8,8 +8,8 @@ from data_util import UtilsFn
 class DataProvider(object):
     def __init__(self,
                  data_form,
-                 path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset',
-                 vocab_path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt'):
+                 path='/home/shyietliu//e2e_dialog/my_dataset',
+                 vocab_path='/home/shyietliu/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt'):
         """
 
         :param path: default : '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'

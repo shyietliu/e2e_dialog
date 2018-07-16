@@ -22,6 +22,7 @@ class E2EModel(object):
         # self.path = data_path
         self.max_num_utterance = 25
         self.max_num_words_in_dialog = 180
+        self.vocab_size = 205
 
         self.embed_matrix = None
         self.load_embed('../my_dataset/sub_glove_embedding_with_oov.txt')
@@ -64,7 +65,7 @@ class E2EModel(object):
         if use_glove:
             embed_matrix = tf.Variable(self.embed_matrix)
         else:
-            embed_matrix = tf.get_variable('embed_matrix', [189, 300],
+            embed_matrix = tf.get_variable('embed_matrix', [self.vocab_size, 300],
                                            initializer=tf.contrib.layers.xavier_initializer(),
                                            dtype=tf.float32)
 
