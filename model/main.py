@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # test = 1, 2, 3, 4
 """
 Basic hyper-parameters
---task_num 1 --model attn_net --lr 1e-4  --epoch 20 --exp_name h_lstm --keep_prob 0.8 --save_model False
+--task_num 1 --model h_lstm --lr 1e-4  --epoch 20 --exp_name h_lstm --keep_prob 0.8 --save_model False
 """
 # utterance = re.sub('!', '', utterance)
 #                             utterance = re.sub(',', ' ,', utterance)
