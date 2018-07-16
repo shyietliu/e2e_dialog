@@ -11,7 +11,7 @@ def reform_test_data(test_data_path, test_answer_path, reformed_data_saved_path)
     Create a new json file that is compatible with the training data form
     :param test_data_path: file path of test set data
     :param test_answer_path: file path of the answer of test set
-    :param reformed_data_saved_path: directory that the new data will be saved
+    :param reformed_data_saved_path: file path that the new data will be saved
     :return: None
     """
     with open(test_data_path) as f:
@@ -82,7 +82,9 @@ if __name__ == '__main__':
     #         for v in ele:
     #             f.write(' '+str(v))
     #         f.write('\n')
-
+    reform_test_data('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/dialog-task2REFINE-kb2_atmosphere_restrictions-distr0.5-tst1000.json',
+                     '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/dialog-task2REFINE-kb2_atmosphere_restrictions-distr0.5-tst1000.answers.json',
+                     '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/task2.json')
     # dp = data_provider.DataProvider(1)
     #
     # train = copy.deepcopy(dp.task1.train)
@@ -90,5 +92,15 @@ if __name__ == '__main__':
     # #
     # train.current_path()
     # val.current_path()
-    print(np.pad([1,2,3], (0, 10 - len([1,2,3])), 'constant'))
+
+    # >> > a = np.array([1, 0, 3])
+    # >> > b = np.zeros((3, 4))
+    # >> > b[np.arange(3), a] = 1
+    # >> > b
+    # array([[0., 1., 0., 0.],
+    #        [1., 0., 0., 0.],
+    #        [0., 0., 0., 1.]])
+
+
+    # print(np.pad([1,2,3], (0, 10 - len([1,2,3])), 'constant'))
     pass

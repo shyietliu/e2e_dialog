@@ -2,6 +2,7 @@ import tensorflow as tf
 from data_provider import DataProvider
 import logger
 import argparse
+import math
 import copy
 
 
@@ -20,9 +21,10 @@ class E2EModel(object):
         self.output_dim = 20
         # self.path = data_path
         self.max_num_utterance = 25
+        self.max_num_words_in_dialog = 180
 
         self.embed_matrix = None
-        self.load_embed('../my_dataset/sub_glove_embedding.txt')
+        self.load_embed('../my_dataset/sub_glove_embedding_with_oov.txt')
 
         self.data_provider = DataProvider(data_form)
 
@@ -70,6 +72,46 @@ class E2EModel(object):
         return embed
 
     @staticmethod
+    def get_position_encoding(length = 180,hidden_size = 300):
+        """
+        Cite from tensorflow
+        Return positional encoding.
+        Calculates the position encoding as a mix of sine and cosine functions with
+        geometrically increasing wavelengths.
+        Defined and formulized in Attention is All You Need, section 3.5.
+        Args:
+          length: Sequence length.
+          hidden_size: Size of the
+          min_timescale: Minimum scale that will be applied at each position
+          max_timescale: Maximum scale that will be applied at each position
+        Returns:
+          Tensor with shape [length, hidden_size]
+        """
+
+        min_timescale = 1.0
+        max_timescale = 1.0e4
+        position = tf.to_float(tf.range(length))
+        num_timescales = hidden_size // 2
+        log_timescale_increment = (
+                math.log(float(max_timescale) / float(min_timescale)) /
+                (tf.to_float(num_timescales) - 1))
+        inv_timescales = min_timescale * tf.exp(
+            tf.to_float(tf.range(num_timescales)) * -log_timescale_increment)
+        scaled_time = tf.expand_dims(position, 1) * tf.expand_dims(inv_timescales, 0)
+        signal = tf.concat([tf.sin(scaled_time), tf.cos(scaled_time)], axis=1)
+        return signal
+
+    def apply_positional_encoding(self, x, length, hidden_size):
+        """
+        Add positional encoding to a batch data 'x' with shape [batch_size, max_words_in_dialog, embed_dim]
+        :param x:
+        :return:
+        """
+        PE = self.get_position_encoding(length=length, hidden_size=hidden_size)
+        xx = x + PE
+        return xx
+
+    @staticmethod
     def length(sequence):
         used = tf.sign(tf.reduce_max(tf.abs(sequence), 2))
         length = tf.reduce_sum(used, 1)
@@ -112,7 +154,7 @@ class E2EModel(object):
 
 if __name__ == '__main__':
 
-    model = E2EModel(1, 1)
+    model = E2EModel(1, 2)
     train = model.train_set
     val = model.val_set
     test = model.test_sets

@@ -2,13 +2,14 @@ import tensorflow as tf
 import data_provider
 import logger
 import argparse
+import numpy as np
 from E2E_model import E2EModel
 
 
 class HierarchicalLSTM(E2EModel):
     def __init__(self, task_num, data_form=1):
         super(HierarchicalLSTM, self).__init__(task_num, data_form)
-        self.lstm_hidden_unit_num = 128
+        self.lstm_hidden_unit_num = 256
         self.max_num_utterance = 25
 
     def lstm_predictor(self, x):
@@ -49,13 +50,14 @@ class HierarchicalLSTM(E2EModel):
 
     def train(self, epochs, exp_name, lr, save_model=False):
 
+        print('-'*30)
+        print('start training ...')
         print('Save model status: ', save_model)
         # inputs & outputs format
         x = tf.placeholder(tf.int32, [None, 25, 30])
         y = tf.placeholder('float', [None, self.output_dim])
 
         # construct computation graph
-
         embed_x = self.embedding_layer(x)
 
         pred = self.lstm_predictor(embed_x)
@@ -71,7 +73,7 @@ class HierarchicalLSTM(E2EModel):
             init = tf.global_variables_initializer()
             sess.run(init)
 
-            # ini logger
+            # init logger
             log_saver = logger.LogSaver(exp_name)
             log_saver.set_log_cate(self.task_num)
 
@@ -81,12 +83,12 @@ class HierarchicalLSTM(E2EModel):
                     batch_x, batch_y = self.train_set.next_batch(100)
                     sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
-                    # print validation information every 10 iteration
-                    if i % 10 == 0 and i != 0:
+                    # print validation information every 40 iteration (half epoch)
+                    if i % 40 == 0 and i != 0:
                         train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
                         train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
 
-                        val_x, val_y = self.val_set.next_batch(100)
+                        val_x, val_y = self.val_set.next_batch(1000)
                         val_acc = accuracy.eval(feed_dict={
                                         x: val_x,
                                         y: val_y})
@@ -95,28 +97,30 @@ class HierarchicalLSTM(E2EModel):
                                                                                                         train_acc,
                                                                                                         val_acc))
 
+                        log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
+
                 # save evaluation result per epoch
-                train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
-                train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
+                # train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                # train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
+                #
+                # val_x, val_y = self.val_set.next_batch(1000)
+                # val_acc = accuracy.eval(feed_dict={
+                #     x: val_x,
+                #     y: val_y})
 
-                val_x, val_y = self.val_set.next_batch(1000)
-                val_acc = accuracy.eval(feed_dict={
-                    x: val_x,
-                    y: val_y})
+                # log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
 
-                log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
-
-            # evaluate after training
-            for index, test_set in enumerate(self.test_sets):
-                if index > 0:
-                    test_x, test_y = test_set.next_batch(1000)
-                    test_acc = sess.run(
-                        accuracy, feed_dict={
-                            x: test_x,
-                            y: test_y})
-                    print('test accuracy on test set {0} is {1}'.format(index, test_acc))
-                    # save training log
-                    log_saver.test_result_saver([test_acc], index)
+                # evaluate on test set per epoch
+                for index, test_set in enumerate(self.test_sets):
+                    if index > 0:
+                        test_x, test_y = test_set.next_batch(1000)
+                        test_acc = sess.run(
+                            accuracy, feed_dict={
+                                x: test_x,
+                                y: test_y})
+                        print('test accuracy on test set {0} is {1}'.format(index, test_acc))
+                        # save training log
+                        log_saver.test_result_saver([test_acc], index)
 
             # Model save
             if save_model:
@@ -124,21 +128,6 @@ class HierarchicalLSTM(E2EModel):
 
 
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description='Train BidirectionalLSTM saved_model')
-    parser.add_argument('-exp_name', dest='exp_name')
-    parser.add_argument('-train_epoch', dest='train_epoch', type=int)
-    parser.add_argument('-lr', dest='learning_rate', type=float)
-
-    args = parser.parse_args()
-
-    DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset'
-
-    model = HierarchicalLSTM(DATA_PATH)
-    train_epoch = args.train_epoch
-    learning_rate = args.learning_rate
-    exp_name = args.exp_name+'_'+str(train_epoch)+'_lr_'+str(learning_rate)
-    model.train(train_epoch, exp_name, learning_rate)
 
     pass
 

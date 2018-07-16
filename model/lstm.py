@@ -69,9 +69,6 @@ class LSTM(E2EModel):
         x = tf.placeholder(tf.int32, [None, 180])
         y = tf.placeholder('float', [None, self.output_dim])
 
-        self.learning_rate = lr
-        self.epochs = epochs
-
         embed_x = self.embedding_layer(x)
 
         # construct computation graph
@@ -101,8 +98,8 @@ class LSTM(E2EModel):
                     batch_x, batch_y = self.train_set.next_batch(100)
                     sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
-                    # print validation information every 10 iteration
-                    if i % 10 == 0 and i != 0:
+                    # print validation information every 40 iteration
+                    if i % 40 == 0 and i != 0:
                         train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
                         train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
 
@@ -114,29 +111,30 @@ class LSTM(E2EModel):
                                                                                                         train_loss,
                                                                                                         train_acc,
                                                                                                         val_acc))
+                        log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
 
                 # save evaluation result per epoch
-                train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
-                train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
+                # train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                # train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
+                #
+                # val_x, val_y = self.val_set.next_batch(1000)
+                # val_acc = accuracy.eval(feed_dict={
+                #     x: val_x,
+                #     y: val_y})
+                #
+                # log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
 
-                val_x, val_y = self.val_set.next_batch(1000)
-                val_acc = accuracy.eval(feed_dict={
-                    x: val_x,
-                    y: val_y})
-
-                log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
-
-            # evaluate after training
-            for index, test_set in enumerate(self.test_sets):
-                if index > 0:
-                    test_x, test_y = test_set.next_batch(1000)
-                    test_acc = sess.run(
-                        accuracy, feed_dict={
-                            x: test_x,
-                            y: test_y})
-                    print('test accuracy on test set {0} is {1}'.format(index, test_acc))
-                    # save training log
-                    log_saver.test_result_saver([test_acc], index)
+                # evaluate on test set per epoch
+                for index, test_set in enumerate(self.test_sets):
+                    if index > 0:
+                        test_x, test_y = test_set.next_batch(1000)
+                        test_acc = sess.run(
+                            accuracy, feed_dict={
+                                x: test_x,
+                                y: test_y})
+                        print('test accuracy on test set {0} is {1}'.format(index, test_acc))
+                        # save training log
+                        log_saver.test_result_saver([test_acc], index)
 
             # Model save
             if save_model:

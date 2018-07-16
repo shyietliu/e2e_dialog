@@ -9,7 +9,7 @@ class DataProvider(object):
     def __init__(self,
                  data_form,
                  path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset',
-                 vocab_path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/_glove_vocab.txt'):
+                 vocab_path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt'):
         """
 
         :param path: default : '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
@@ -26,7 +26,7 @@ class DataProvider(object):
         self.ALREADY_LOAD_VOCAB = 0
         self.sequence_max_len = 30
         self.max_num_utterance = 25  # maximal number of utterances in dialog
-        self.max_num_words_in_dialog = 160
+        self.max_num_words_in_dialog = 180
         self.shuffle_index = None
         self.data_form = data_form
 
@@ -177,10 +177,16 @@ class DataProvider(object):
         vocabulary = []
 
         data_tasks_path = [
-            '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/train/dialog-task1API-kb1_atmosphere-distr0.5-trn10000.json',
-            '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/train/dialog-task2REFINE-kb1_atmosphere-distr0.5-trn10000.json']
-            # '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/train/dialog-task4INFOS-kb1_atmosphere-distr0.5-trn10000.json',
-            # '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/train/dialog-task5FULL-kb1_atmosphere-distr0.5-trn10000.json']
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/task1/train/train_data.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/task2/train/train_data.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst1/task1.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst1/task2.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst2/task1.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst2/task2.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst3/task1.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst3/task2.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/task1.json',
+            '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/task2.json']
 
         for i, data_path in enumerate(data_tasks_path):
             # read data file
@@ -221,7 +227,7 @@ class DataProvider(object):
                             vocabulary.append(word)
 
         # save vocabulary
-        v_file_name = '_glove_vocab.txt'
+        v_file_name = '_all_glove_vocab.txt'
 
         if not os.path.exists(vocab_path):
             os.makedirs(vocab_path)
@@ -325,7 +331,6 @@ class DataProvider(object):
         data_size = len(self.data)  # the size of training data
 
         total_num_batch = int(data_size / batch_size)  # the number of batches
-        print(total_num_batch)
 
         # # shuffle data
         if self.shuffle_index is None:
@@ -404,8 +409,8 @@ class DataProvider(object):
                         utterance = self.clean_data(utterance)
                         # words in each utterance, list of strings
                         dialog += [self.word2idx(ele) for ele in utterance.split()]
-                    padded_dialog = np.pad(dialog, (0, 180 - len(dialog)), 'constant')
-                    x_batch.append(padded_dialog.tolist() + [np.zeros([(25-len(padded_dialog)), 1]).tolist()])
+                    padded_dialog = np.pad(dialog, (0, self.max_num_words_in_dialog - len(dialog)), 'constant')
+                    x_batch.append(padded_dialog.tolist())
 
                 elif data_type == 'one_hot':
                     raise Exception('not implement')
@@ -425,16 +430,16 @@ class DataProvider(object):
 
                 else:
                     raise Exception('data_type must be \'word\' or \'index\' or \'one_hot\'!')
-        print(self.batch_count)
+        # print(self.batch_count)
         if self.batch_count == total_num_batch-1:
             self.batch_count = 0  # reset count
         else:
             self.batch_count = self.batch_count + 1
-        print(self.batch_count)
+        # print(self.batch_count)
 
-        # if self.data_form == 1:
+        # if self.data_form == 2:
         #     # padding to 25 utterances each dialog
-        #     x_batch = x_batch
+        #     x_batch = x_batch + [np.zeros([(25-len(x_batch)), 1]).tolist()]
         return x_batch, y_batch
 
     @property
@@ -535,17 +540,19 @@ if __name__ == '__main__':
     data_provider = DataProvider(data_form=1)
     # data_provider.select_embedding('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/glove.6B.300d.txt', '../my_dataset/sub_glove_embedding.txt')
 
-    # data_provider.create_vocab('../my_dataset/')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
-    x, y = data_provider.task1.val.next_batch(1000, data_type='index', label_type='word')
+    # data_provider.create_vocab('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/')
+    data_provider.select_embedding('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/glove.6B/glove.6B.300d.txt',
+                                   '../my_dataset/sub_glove_embedding_with_oov.txt')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # x, y = data_provider.task1.val.next_batch(1000, data_type='index', label_type='word')
     # x2, y2 = data_provider.task2.train.next_batch(1, data_type='index', label_type='word')
     # x3, y3 = data_provider.task2.train.next_batch(1, data_type='index', label_type='word')
     # data_provider.task2.train.current_path()

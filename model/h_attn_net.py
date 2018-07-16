@@ -5,7 +5,7 @@ import logger
 
 
 class AttnNet(E2EModel):
-    def __init__(self, task_num, data_form=2):
+    def __init__(self, task_num, data_form=1):
         super(AttnNet, self).__init__(task_num, data_form)
         self.hidden_unit_num = 2048
         self.output_dim = 20
@@ -65,14 +65,29 @@ class AttnNet(E2EModel):
         output = normed_x + x
         return output
 
-    def attention_network(self, x, keep_prob):
+    def hierarchical_attention_network(self, x, keep_prob):
+        sentence_representation = []
+        def word_level_attn_net(dialog):
+            for i in range(self.max_num_utterance):
+                utterance = dialog[:, i, :, :]
+                with tf.variable_scope('word_level_attn_net' + str(i)):
+                    attn_out = self.add_and_norm(utterance, self.self_attention(utterance, keep_prob=keep_prob))
+                    ff_out = self.add_and_norm(attn_out_1, self.feed_forward(attn_out_1, 1, keep_prob=keep_prob))
+                sentence_representation.append(ff_out)
+
+            return tf.convert_to_tensor(sentence_representation)
+
+        def sentence_level_attn_net(representation):
+            pass
+
+
+
 
         attn_out_1 = self.add_and_norm(x, self.self_attention(x, keep_prob=keep_prob))
         ff_out_1 = self.add_and_norm(attn_out_1, self.feed_forward(attn_out_1, 1, keep_prob=keep_prob))
 
         hidden_1 = tf.layers.dense(tf.reshape(ff_out_1, [-1, 180*300]), 512, tf.nn.relu)
-        # hidden_2 = tf.layers.dense(hidden_1, 256, tf.nn.relu)
-        # hidden = self.attention_layer(hidden, attn_output_dim=2048)
+
         logits = tf.layers.dense(hidden_1, self.output_dim, name='logits')
 
         return logits
@@ -80,16 +95,17 @@ class AttnNet(E2EModel):
     def train(self, epochs, exp_name, lr=1e-3, keep_prob=0.8, save_model=False):
 
         # inputs & outputs format
-        x = tf.placeholder(tf.int32, [None, 180], name='x')
+        x = tf.placeholder(tf.int32, [None, 25, 30], name='x')
         y = tf.placeholder('float', [None, self.output_dim], name='y')
         dropout_rate = tf.placeholder('float', [])
 
         # construct computation graph
         embed_x = self.embedding_layer(x)  # shape [Batch_size, 180, 300]
 
-        pe_x = self.apply_positional_encoding(embed_x)
+        # pe_x = self.apply_positional_encoding(embed_x)
 
-        logits = self.attention_network(pe_x, keep_prob=dropout_rate)
+        logits = self.hierarchical_attention_network(embed_x, keep_prob=dropout_rate)
+
         loss = self.compute_loss(logits, y)
 
         accuracy = self.compute_accuracy(logits, y)
