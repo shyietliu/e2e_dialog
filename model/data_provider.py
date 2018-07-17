@@ -35,6 +35,7 @@ class DataProvider(object):
         self.PREVIOUS_BATCH_SIZE = None
 
         self.load_vocab(vocab_path)
+        self.slot_words = []
         np.random.seed(1000)
 
     @property
@@ -301,7 +302,8 @@ class DataProvider(object):
 
     def next_batch(self, batch_size,
                    data_type='index',
-                   label_type='one_hot'):
+                   label_type='one_hot',
+                   mask_input=False):
         """
         get batch data
         :returns x_batch: batch dialog history, stored in a 3D list: [batch number, utterance number, word number]
@@ -379,6 +381,9 @@ class DataProvider(object):
                             utterance = self.clean_data(utterance)
                             # append words in each utterance, list of strings
                             words_index = [self.word2idx(ele) for ele in utterance.split()]
+                            if mask_input:
+                                index_set_to_zero = np.random.randint(1, len(words_index))
+                                words_index[index_set_to_zero] = 0
                             dialog.append(np.pad(words_index, (0, 30 - len(words_index)), 'constant').tolist())
 
                     elif data_type == 'one_hot':

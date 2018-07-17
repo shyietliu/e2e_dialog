@@ -80,7 +80,7 @@ class HierarchicalLSTM(E2EModel):
             # train
             for epoch in range(epochs):
                 for i in range(int(8000/100)):
-                    batch_x, batch_y = self.train_set.next_batch(100)
+                    batch_x, batch_y = self.train_set.next_batch(100, mask_input=True)
                     sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
                     # print validation information every 40 iteration (half epoch)
