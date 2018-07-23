@@ -2,9 +2,10 @@ import tensorflow as tf
 from data_provider import DataProvider
 import logger
 import argparse
+import time
 import math
 import copy
-
+import numpy as np
 
 class E2EModel(object):
     def __init__(self, task_num, data_form):
@@ -21,6 +22,7 @@ class E2EModel(object):
         self.output_dim = 20
         # self.path = data_path
         self.max_num_utterance = 25
+        self.max_len_utterance = 30
         self.max_num_words_in_dialog = 180
         self.vocab_size = 205
 
@@ -61,7 +63,7 @@ class E2EModel(object):
 
         self.embed_matrix = embed_matrix
 
-    def embedding_layer(self, x, use_glove=True):
+    def embedding_layer(self, x, use_glove=True, mask=False):
         if use_glove:
             embed_matrix = tf.Variable(self.embed_matrix)
         else:
@@ -70,7 +72,13 @@ class E2EModel(object):
                                            dtype=tf.float32)
 
         embed = tf.nn.embedding_lookup(embed_matrix, x)
-        return embed
+        if mask:
+            mask_index = 0
+            mask_matrix = np.ones([1, 300])
+            mask_matrix[mask_index] = 0
+            return embed * mask_matrix
+        else:
+            return embed
 
     @staticmethod
     def get_position_encoding(length = 180,hidden_size = 300):
@@ -106,6 +114,8 @@ class E2EModel(object):
         """
         Add positional encoding to a batch data 'x' with shape [batch_size, max_words_in_dialog, embed_dim]
         :param x:
+        length is the sequence leng
+        hidden_size is the hidden dimension of each element in that sequence
         :return:
         """
         PE = self.get_position_encoding(length=length, hidden_size=hidden_size)
@@ -114,6 +124,11 @@ class E2EModel(object):
 
     @staticmethod
     def length(sequence):
+        """
+
+        :param sequence: Input shape: [batch_size, sequence_max_len, feature_dim]
+        :return:
+        """
         used = tf.sign(tf.reduce_max(tf.abs(sequence), 2))
         length = tf.reduce_sum(used, 1)
         length = tf.cast(length, tf.int32)
@@ -135,6 +150,16 @@ class E2EModel(object):
 
         return accuracy
 
+    @classmethod
+    def timer(cls, func):
+        def wrapper(*arg, **kwargs):
+            start_time = time.time()
+            func(*arg, **kwargs)
+            end_time = time.time()
+            print('running time {0:f}'.format(end_time - start_time))
+
+        return wrapper
+
     @staticmethod
     def attention_layer(x, attn_output_dim=1024):
         """
@@ -146,7 +171,7 @@ class E2EModel(object):
         align_matrix = tf.matmul(tf.einsum('ijk->ikj', x), x)
         alignment = tf.nn.softmax(align_matrix, 0)
         context_vector = tf.matmul(x, alignment)
-        attention_output = tf.layers.dense(tf.reshape(context_vector, [-1, 180 * 128]),  # was 160*128
+        attention_output = tf.layers.dense(tf.reshape(context_vector, [-1, 180 * 256]),  # was 160*128
                                            attn_output_dim,
                                            activation=tf.nn.tanh)
 
@@ -156,13 +181,16 @@ class E2EModel(object):
 if __name__ == '__main__':
 
     model = E2EModel(1, 2)
-    train = model.train_set
-    val = model.val_set
-    test = model.test_sets
+    input = [[1,2,3,4,4,2],
+                  [1,2,4,3,2,2],
+             [0.1, 0, 0, 0, 0, 0],
+                  [1, 2, 4, 3, 2, 2],
+                  [0, 0, 0, 0, 0, 0]                  ]
+    val_to_keep = 0
+    print(np.array(input).shape)
+    length = model.length(tf.convert_to_tensor([input, input]))
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        print(sess.run(length))
 
-    train.current_path()
-    val.current_path()
-    for i,tst in enumerate(test):
-        if i>0:
-            tst.current_path()
 

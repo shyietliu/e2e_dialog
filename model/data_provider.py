@@ -8,8 +8,10 @@ from data_util import UtilsFn
 class DataProvider(object):
     def __init__(self,
                  data_form,
-                 path='/home/shyietliu//e2e_dialog/my_dataset',
-                 vocab_path='/home/shyietliu/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt'):
+                 path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset',
+                 vocab_path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt'):
+                 # path='/home/shyietliu//e2e_dialog/my_dataset',
+                 # vocab_path='/home/shyietliu/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt'):
         """
 
         :param path: default : '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
@@ -35,7 +37,7 @@ class DataProvider(object):
         self.PREVIOUS_BATCH_SIZE = None
 
         self.load_vocab(vocab_path)
-        self.slot_words = []
+        self.slot_words = [191, 192, 196, 82, 30, 61, 102, 44, 112, 116, 63, 194, 189, 19, 88, 95, 193, 190, 197]
         np.random.seed(1000)
 
     @property
@@ -341,6 +343,7 @@ class DataProvider(object):
         # get batch data
         x_batch = []
         y_batch = []
+        mask_batch = []
         # for each data pair in a batch
         for index in range(self.batch_count*batch_size, (self.batch_count+1)*batch_size):
             x = self.data[self.shuffle_index[index]]['utterances']  # list, each element is an utterance (string)
@@ -374,33 +377,41 @@ class DataProvider(object):
                 if data_type == 'word':
                     x_batch.append(x)
                     # y_batch.append(y)
-                elif data_type == 'index' or data_type == 'one_hot':
+                elif data_type == 'index':
                     dialog = []
-                    if data_type == 'index':
-                        for utterance in x:
-                            utterance = self.clean_data(utterance)
-                            # append words in each utterance, list of strings
-                            words_index = [self.word2idx(ele) for ele in utterance.split()]
-                            if mask_input:
-                                index_set_to_zero = np.random.randint(1, len(words_index))
-                                words_index[index_set_to_zero] = 0
-                            dialog.append(np.pad(words_index, (0, 30 - len(words_index)), 'constant').tolist())
-
-                    elif data_type == 'one_hot':
-                        for i in range(self.max_num_utterance):
-                            if i < len(x):
-                                utterance = x[i]
-                                utterance = re.sub('[,.?!]', '', utterance)
-                                dialog.append(self.one_hot([self.word2idx(ele) for ele in utterance.split()],
-                                                           vocab_size=self.vocab_size,
-                                                           pad=True,
-                                                           max_len=self.sequence_max_len))
+                    # slot words in a dialog
+                    mask_matrix = []
+                    for utterance in x:
+                        utterance = self.clean_data(utterance)
+                        # append words in each utterance, list of strings
+                        words_index = [self.word2idx(ele) for ele in utterance.split()]
+                        # slot words in a utterance
+                        mask_index = []
+                        for idx in range(len(words_index)):
+                            rnd = np.random.random(1)
+                            if words_index[idx] in self.slot_words and rnd > 0.5:
+                                mask_index.append(0.0)
                             else:
-                                dialog.append(np.zeros([self.sequence_max_len, self.vocab_size]).tolist())
-                        # answer = self.one_hot([self.word2idx(ele) for ele in y.split()])
+                                mask_index.append(1.0)
+                        mask_matrix.append(np.pad(mask_index, (0, 30 - len(words_index)), 'constant', constant_values=1).tolist())
+                        dialog.append(np.pad(words_index, (0, 30 - len(words_index)), 'constant').tolist())
+
+                    # elif data_type == 'one_hot':
+                    #     for i in range(self.max_num_utterance):
+                    #         if i < len(x):
+                    #             utterance = x[i]
+                    #             utterance = re.sub('[,.?!]', '', utterance)
+                    #             dialog.append(self.one_hot([self.word2idx(ele) for ele in utterance.split()],
+                    #                                        vocab_size=self.vocab_size,
+                    #                                        pad=True,
+                    #                                        max_len=self.sequence_max_len))
+                    #         else:
+                    #             dialog.append(np.zeros([self.sequence_max_len, self.vocab_size]).tolist())
+
+                    mask_batch.append(mask_matrix + np.zeros([(25 - len(mask_matrix)), 30]).tolist())
 
                     x_batch.append(dialog + np.zeros([(25 - len(dialog)), 30]).tolist())
-                    # y_batch.append(answer)
+
                 else:
                     raise Exception('data_type must be \'word\' or \'index\' or \'one_hot\'!')
 
@@ -416,36 +427,31 @@ class DataProvider(object):
                         dialog += [self.word2idx(ele) for ele in utterance.split()]
                     padded_dialog = np.pad(dialog, (0, self.max_num_words_in_dialog - len(dialog)), 'constant')
                     x_batch.append(padded_dialog.tolist())
-
-                elif data_type == 'one_hot':
-                    raise Exception('not implement')
-                    dialog = []
-                    for utterance in x:
-                        utterance = re.sub('[,.?!]', '', utterance)
-                        for word in utterance.split():
-                            word = self.one_hot([self.word2idx(word)],
-                                                vocab_size=self.vocab_size)
-                            dialog.append(word[0])
-
-                    # padding dialog to the number of all words in dialog
-                    pad_num = self.max_num_words_in_dialog - len(dialog)
-                    dialog = dialog + np.zeros([pad_num, self.vocab_size]).tolist()
-
-                    x_batch.append(dialog)
+                # elif data_type == 'one_hot':
+                #     raise Exception('not implement')
+                #     dialog = []
+                #     for utterance in x:
+                #         utterance = re.sub('[,.?!]', '', utterance)
+                #         for word in utterance.split():
+                #             word = self.one_hot([self.word2idx(word)],
+                #                                 vocab_size=self.vocab_size)
+                #             dialog.append(word[0])
+                #
+                #     # padding dialog to the number of all words in dialog
+                #     pad_num = self.max_num_words_in_dialog - len(dialog)
+                #     dialog = dialog + np.zeros([pad_num, self.vocab_size]).tolist()
+                #
+                #     x_batch.append(dialog)
 
                 else:
                     raise Exception('data_type must be \'word\' or \'index\' or \'one_hot\'!')
-        # print(self.batch_count)
+
         if self.batch_count == total_num_batch-1:
             self.batch_count = 0  # reset count
         else:
             self.batch_count = self.batch_count + 1
-        # print(self.batch_count)
 
-        # if self.data_form == 2:
-        #     # padding to 25 utterances each dialog
-        #     x_batch = x_batch + [np.zeros([(25-len(x_batch)), 1]).tolist()]
-        return x_batch, y_batch
+        return x_batch, y_batch, mask_batch
 
     @property
     def answer_category(self):
@@ -542,13 +548,16 @@ if __name__ == '__main__':
     DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset'
 
     # data_provider = DataProvider(data_form=2, path='/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset/task1/train/train_data.json')
-    data_provider = DataProvider(data_form=1)
+    data_provider = DataProvider(data_form=1,
+                                 path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset',
+                                 vocab_path='/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/_with_oov_glove_vocab.txt')
+
     # data_provider.select_embedding('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset/glove.6B.300d.txt', '../my_dataset/sub_glove_embedding.txt')
 
     # data_provider.create_vocab('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/')
-    data_provider.select_embedding('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/glove.6B/glove.6B.300d.txt',
-                                   '../my_dataset/sub_glove_embedding_with_oov.txt')
-    # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
+    # data_provider.select_embedding('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/glove.6B/glove.6B.300d.txt',
+    #                                '../my_dataset/sub_glove_embedding_with_oov.txt')
+    x, y, mask = data_provider.task1.val.next_batch(10, data_type='index', label_type='word', mask_input=False)
     # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
     # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')
     # _, _ = data_provider.task1.val.next_batch(100, data_type='index', label_type='word')

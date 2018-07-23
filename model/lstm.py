@@ -9,7 +9,7 @@ import tqdm
 class LSTM(E2EModel):
     def __init__(self, task_num, data_form=2, bidirection=False, attn_usage=True):
         super(LSTM, self).__init__(task_num, data_form)
-        self.lstm_hidden_unit_num = 128
+        self.lstm_hidden_unit_num = 256
         self.output_dim = 20
         self.bidirection = bidirection
         self.attn_usage = attn_usage
@@ -51,7 +51,7 @@ class LSTM(E2EModel):
         if self.attn_usage:
             output = self.attention_layer(lstm_outputs, attn_output_dim=1024)
         else:
-            output = tf.layers.dense(last_state.h, 128, tf.nn.relu)
+            output = tf.layers.dense(last_state.h, 256, tf.nn.relu)
 
         logits = tf.layers.dense(output, self.output_dim)
 
@@ -94,16 +94,16 @@ class LSTM(E2EModel):
 
             # train
             for epoch in range(epochs):
-                for i in range(int(8000/100)):
-                    batch_x, batch_y = self.train_set.next_batch(100)
+                for i in range(int(8000/1000)):
+                    batch_x, batch_y, _ = self.train_set.next_batch(1000)
                     sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
                     # print validation information every 40 iteration
-                    if i % 40 == 0 and i != 0:
+                    if i % 4 == 0 and i != 0:
                         train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
                         train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
 
-                        val_x, val_y = self.val_set.next_batch(1000)
+                        val_x, val_y, _ = self.val_set.next_batch(1000)
                         val_acc = accuracy.eval(feed_dict={
                                         x: val_x,
                                         y: val_y})
@@ -127,7 +127,7 @@ class LSTM(E2EModel):
                 # evaluate on test set per epoch
                 for index, test_set in enumerate(self.test_sets):
                     if index > 0:
-                        test_x, test_y = test_set.next_batch(1000)
+                        test_x, test_y, _ = test_set.next_batch(1000)
                         test_acc = sess.run(
                             accuracy, feed_dict={
                                 x: test_x,

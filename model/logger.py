@@ -1,5 +1,17 @@
 import os
 import tensorflow as tf
+import time
+
+
+def timer(func):
+    def wrapper(*arg, **kwargs):
+        start_time = time.time()
+        func(*arg, **kwargs)
+        end_time = time.time()
+        print('running time {0:f}'.format(end_time-start_time))
+
+    return wrapper
+
 
 class LogSaver(object):
     def __init__(self, exp_name, log_path=None):

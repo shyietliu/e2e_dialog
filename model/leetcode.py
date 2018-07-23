@@ -1,66 +1,46 @@
-
-class Solution(object):
-    def threeSum(self, nums):
+class Solution:
+    def numDecodings(self, s):
         """
-        :type nums: List[int]
-        :rtype: List[List[int]]
+        :type s: str
+        :rtype: int
         """
-        res = []
-        xxx = []
+        length = len(s)
+        if length == 1:
+            if s == '0':
+                return 0
+            else:
+                return 1
 
+        num_decode_methods = []  # the number of different decode methods at each position
+        # state = []  # state for each position
+        #             # 1 denotes the number at that position only has 1 decode method
+        #             # 0 denotes the number at that position has more than 1 decode methods
+        for i, char in enumerate(s):
+            if i == 0:
+                num_decode_methods.append(1)
 
-        targets = [-num for num in nums]
-        index = 0
-        for target in targets:
-            double_list = self.twoSum(nums, target)
-            # print(double_list)
+            if i == 1:
+                if char == '0':
+                    num_decode_methods.append(num_decode_methods[i - 1])
+                else:
+                    if int(s[i - 1] + char) <= 26:
+                        num_decode_methods.append(2)
+                    else:
+                        num_decode_methods.append(1)
+                print(num_decode_methods)
+            else:
+                if int(s[i - 1] + char) > 26:
+                    num_decode_methods.append(num_decode_methods[i - 1] + 0)
 
-            if double_list is not None:
-                # deleted_double_lst = self.delete_identical(double_list)
-                xx = [ele+[index] for ele in double_list]
-                new_tri = [set(ele+[index]) for ele in double_list]
-                # if set(new_tri)
-                res += new_tri
-                xxx += xx
-            index += 1
+                elif int(s[i - 1] + char) <= 26:
 
-        print(res)
-        res_index = [list(ele) for ele in res if len(ele) == 3]
-        res_val = []
-        for ele in res_index:
-            ele_val = [nums[ele_index] for ele_index in ele]
-            res_val.append(ele_val)
-        return res_index, xxx
+                    if char == '0':
+                        num_decode_methods.append(num_decode_methods[i - 1] + 0)
+                    else:
+                        num_decode_methods.append(num_decode_methods[i - 1] + 1)
 
-    @staticmethod
-    def delete_identical(lst):
-        """
-        Each element in lst is a list of a pair of 2 ints, delete identical pairs in lst
-        """
-        new_lst = []
-        for pair in lst:
-            if pair not in new_lst and [pair[1],pair[0]] not in new_lst:
-                new_lst.append(pair)
-        return new_lst
-        # new_lst = []
-        # for tri in lst:
-        #     if tri not in new_lst and [tri[0]]:
-
-    @staticmethod
-    def twoSum(nums, target):
-        """
-        :type nums: List[int]
-        :type target: int
-        :rtype: List[[int]]
-        """
-        res = []
-        length = len(nums)
-        for i, first_num in enumerate(nums):
-            second_num = target - first_num
-            if second_num in nums[i+1:]:
-                res.append([i, nums.index(second_num)])
-
-        return res
+            # print (num_decode_methods)
+        return num_decode_methods[-1]
 
 
 if __name__ == '__main__':
@@ -69,7 +49,7 @@ if __name__ == '__main__':
 
     # print(solution.delete_identical(solution.twoSum([1,2,2,3,4,1, 1.5, 1.5], 3)))
 
-    print(solution.threeSum([1,-1,2,0,-3]))
-    res, _ = solution.threeSum([1,-1,2,0,-3])
+    print(solution.numDecodings('226'))
+    pass
     # print([list(ele) for ele in res if len(ele) == 3])
     # print(solution.delete_identical(solution.threeSum([1,-1,1,2,0,-3])))

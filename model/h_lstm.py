@@ -56,9 +56,12 @@ class HierarchicalLSTM(E2EModel):
         # inputs & outputs format
         x = tf.placeholder(tf.int32, [None, 25, 30])
         y = tf.placeholder('float', [None, self.output_dim])
+        # mask = tf.placeholder(tf.float32, [None, 25, 30])
 
         # construct computation graph
         embed_x = self.embedding_layer(x)
+        
+        # masked_embed = tf.einsum('abcd,abc->abcd', embed_x, mask)
 
         pred = self.lstm_predictor(embed_x)
 
@@ -78,20 +81,35 @@ class HierarchicalLSTM(E2EModel):
             log_saver.set_log_cate(self.task_num)
 
             # train
+            # all_one_mask = np.ones([1000, 25, 30])
+            #
+            # all_one_mask_for_training = np.ones([100, 25, 30])
+
             for epoch in range(epochs):
-                for i in range(int(8000/100)):
-                    batch_x, batch_y = self.train_set.next_batch(100, mask_input=True)
+                for i in range(int(8000/1000)):
+                    # batch_x, batch_y, batch_mask = self.train_set.next_batch(100, mask_input=True)
+                    batch_x, batch_y, _ = self.train_set.next_batch(1000, mask_input=False)
+                    # sess.run(train_op, feed_dict={x: batch_x, y: batch_y, mask: all_one_mask_for_training})
                     sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
 
                     # print validation information every 40 iteration (half epoch)
-                    if i % 40 == 0 and i != 0:
+                    if i % 4 == 0 and i != 0:
+                        # train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y, mask: all_one_mask_for_training})
+                        # train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y, mask: all_one_mask_for_training})
                         train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
                         train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
 
-                        val_x, val_y = self.val_set.next_batch(1000)
+                        val_x, val_y, _ = self.val_set.next_batch(1000)
+
+                        # val_acc = accuracy.eval(feed_dict={
+                        #                 x: val_x,
+                        #                 y: val_y,
+                        #                 mask: all_one_mask})
+
                         val_acc = accuracy.eval(feed_dict={
                                         x: val_x,
-                                        y: val_y})
+                                        y: val_y
+                                        })
                         print('Epoch, {0}, Train loss,{1:2f}, Train acc, {2:3f}, Val_acc,{3:3f}'.format(epoch,
                                                                                                         train_loss,
                                                                                                         train_acc,
@@ -113,11 +131,18 @@ class HierarchicalLSTM(E2EModel):
                 # evaluate on test set per epoch
                 for index, test_set in enumerate(self.test_sets):
                     if index > 0:
-                        test_x, test_y = test_set.next_batch(1000)
+                        test_x, test_y, _ = test_set.next_batch(1000)
+                        # test_acc = sess.run(
+                        #     accuracy, feed_dict={
+                        #         x: test_x,
+                        #         y: test_y,
+                        #         mask: all_one_mask})
+
                         test_acc = sess.run(
                             accuracy, feed_dict={
                                 x: test_x,
-                                y: test_y})
+                                y: test_y,
+                                })
                         print('test accuracy on test set {0} is {1}'.format(index, test_acc))
                         # save training log
                         log_saver.test_result_saver([test_acc], index)

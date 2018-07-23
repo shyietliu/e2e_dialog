@@ -12,8 +12,9 @@ class MultiLayerPerceptron(E2EModel):
         :param task_num: train model on which task
         """
         super(MultiLayerPerceptron, self).__init__(task_num, data_form)
-        self.hidden_unit_num = 2048
+        self.hidden_unit_num = 512
         self.output_dim = 20
+        self.data_form = data_form
         # self.path = data_path
 
     def multi_layer_softmax_classifier(self, x):
@@ -23,16 +24,28 @@ class MultiLayerPerceptron(E2EModel):
 
         return logits
 
-    def train(self, epochs, exp_name, lr=1e-4, save_model=False):
+    def train(self, epochs, exp_name, lr=1e-4, keep_prob=0.8, save_model=False):
+
+        print('-' * 20, 'save model state', '-' * 20)
+        print(save_model)
 
         # inputs & outputs format
-        x = tf.placeholder(tf.float32, [None, 25, 30, 188], name='x')
+        if self.data_form == 1:
+            x = tf.placeholder(tf.int32, [None, 25, 30], name='x')
+        elif self.data_form == 2:
+            x = tf.placeholder(tf.int32, [None, self.max_num_words_in_dialog], name='x')
+
         y = tf.placeholder('float', [None, self.output_dim], name='y')
+        dropout_rate = tf.placeholder('float', [])
 
         # construct computation graph
-        logits = self.multi_layer_softmax_classifier(tf.reshape(x, [-1, 25*30*188]))
+        embed_x = self.embedding_layer(x)
+        if self.data_form == 1:
+            flatten_embed = tf.reshape(embed_x, [-1, 25 * 30 * 300])
+        elif self.data_form == 2:
+            flatten_embed = tf.reshape(embed_x, [-1,  self.max_num_words_in_dialog * 300])
+        logits = self.multi_layer_softmax_classifier(flatten_embed)
         loss = self.compute_loss(logits, y)
-
         accuracy = self.compute_accuracy(logits, y)
 
         train_op = tf.train.AdamOptimizer(learning_rate=lr).minimize(loss, name='train_op')
@@ -46,39 +59,65 @@ class MultiLayerPerceptron(E2EModel):
             log_saver.set_log_cate(self.task_num)
 
             # train
-            for epoch in range(epochs):
-                batch_x, batch_y = self.train_set.next_batch(100)
-                sess.run(train_op, feed_dict={x: batch_x, y: batch_y})
+            with tf.Session() as sess:
+                # initialization
+                init = tf.global_variables_initializer()
+                sess.run(init)
 
-                # validating
-                if epoch % 10 == 0:
-                    train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                log_saver = logger.LogSaver(exp_name)
+                log_saver.set_log_cate(self.task_num)
 
-                    val_x, val_y = self.val_set.next_batch(100)
-                    val_acc = accuracy.eval(feed_dict={
-                                    x: val_x,
-                                    y: val_y})
-                    print('Training {0} epoch, validation accuracy is {1}, training loss is {2}'.format(epoch,
-                                                                                                        val_acc,
-                                                                                                        train_loss))
-                    # save train process
-                    log_saver.train_process_saver([epoch, train_loss, val_acc])
+                # train
+                for epoch in range(epochs):
+                    for i in range(int(8000 / 1000)):
+                        batch_x, batch_y, _ = self.train_set.next_batch(1000)
+                        sess.run(train_op, feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob})
 
-            # evaluate
-            for index, test_set in enumerate(self.test_sets):
-                if index > 0:
-                    test_x, test_y = test_set.next_batch(100)
-                    test_acc = sess.run(
-                        accuracy, feed_dict={
-                            x: test_x,
-                            y: test_y})
-                    print('test accuracy on test set {0} is {1}'.format(index, test_acc))
-                    # save training log
-                    log_saver.test_result_saver([test_acc], index)
+                        # print validation information every 40 iteration (half epoch)
+                        if i % 4 == 0 and i != 0:
+                            train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob})
+                            train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob})
 
-            # Model save
-            if save_model:
-                log_saver.model_saver(sess)
+                            val_x, val_y,_ = self.val_set.next_batch(1000)
+                            val_acc = accuracy.eval(feed_dict={
+                                x: val_x,
+                                y: val_y,
+                                dropout_rate: 1.0})
+                            print('Epoch, {0}, Train loss,{1:2f}, Train acc, {2:3f}, Val_acc,{3:3f}'.format(epoch,
+                                                                                                            train_loss,
+                                                                                                            train_acc,
+                                                                                                            val_acc))
+                            log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
+
+                    # save evaluation result per epoch
+                    # train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y})
+                    # train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y})
+                    #
+                    # val_x, val_y = self.val_set.next_batch(1000)
+                    # val_acc = accuracy.eval(feed_dict={
+                    #     x: val_x,
+                    #     y: val_y})
+                    #
+                    # log_saver.train_process_saver([epoch, train_loss, train_acc, val_acc])
+
+                    # evaluate on test set per epoch
+                    for index, test_set in enumerate(self.test_sets):
+                        if index > 0:
+                            test_x, test_y,_ = test_set.next_batch(1000)
+                            test_acc = sess.run(
+                                accuracy, feed_dict={
+                                    x: test_x,
+                                    y: test_y,
+                                    dropout_rate: 1.0})
+                            print('test accuracy on test set {0} is {1}'.format(index, test_acc))
+                            # save training log
+                            log_saver.test_result_saver([test_acc], index)
+
+                # Model save
+                print('-'*20,'save model state', '-'*20)
+                print(save_model)
+                if save_model:
+                    log_saver.model_saver(sess)
 
 
 if __name__ == '__main__':

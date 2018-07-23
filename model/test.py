@@ -4,6 +4,7 @@ import tensorflow as tf
 import os
 import data_provider
 import copy
+import time
 
 
 def reform_test_data(test_data_path, test_answer_path, reformed_data_saved_path):
@@ -66,6 +67,30 @@ def count_answer_category(file_path, saved_path):
             f.write(ele)
 
 
+def timer(func):
+    def wrapper(*arg, **kwargs):
+        start_time = time.time()
+        func(*arg, **kwargs)
+        end_time = time.time()
+        print('running time {0:f}'.format(end_time-start_time))
+
+    return wrapper
+
+
+
+class MyClass(object):
+    def __init__(self):
+        pass
+
+
+
+    @timer
+    def inner_function(self):
+        print('running inner function! {0}, {1}')
+
+
+
+
 if __name__ == '__main__':
     # with open('/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/my_dataset/task1/val/val_data.json', 'r') as f:
     #     train_data = json.load(f)
@@ -76,15 +101,15 @@ if __name__ == '__main__':
     #     print(answer)
     #
     # with open('../my_dataset/sub_glove_embedding.txt', 'a') as f:
-    #     a = np.round(np.zeros([1, 300]), decimals=5).tolist()
+    #     a = np.round(np.random.normal(0, 0.01, [1, 300]), decimals=5).tolist()
     #
     #     for ele in a:
     #         for v in ele:
     #             f.write(' '+str(v))
     #         f.write('\n')
-    reform_test_data('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/dialog-task2REFINE-kb2_atmosphere_restrictions-distr0.5-tst1000.json',
-                     '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/dialog-task2REFINE-kb2_atmosphere_restrictions-distr0.5-tst1000.answers.json',
-                     '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/task2.json')
+    # reform_test_data('/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/dialog-task2REFINE-kb2_atmosphere_restrictions-distr0.5-tst1000.json',
+    #                  '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/dialog-task2REFINE-kb2_atmosphere_restrictions-distr0.5-tst1000.answers.json',
+    #                  '/Users/shyietliu/python/E2E/e2e_dialog/my_dataset/dataset-E2E-goal-oriented-test-v1.0/tst4/task2.json')
     # dp = data_provider.DataProvider(1)
     #
     # train = copy.deepcopy(dp.task1.train)
@@ -101,6 +126,16 @@ if __name__ == '__main__':
     #        [1., 0., 0., 0.],
     #        [0., 0., 0., 1.]])
 
-
+    obj = MyClass()
+    obj.inner_function()
+    # inner_function()
+    # index_set_to_zer
+    # o = np.random.random(1)
+    # print(index_set_to_zero)
+    # with tf.Session() as sess:
+    #     sess.run(tf.global_variables_initializer())
+    #     a = tf.convert_to_tensor(np.arange(16).reshape(2, 2, 2, 2))
+    #     b = tf.convert_to_tensor(np.array([[[0,1],[0,0]],[[1,0],[1,0]]]))
+    #     print(sess.run(tf.einsum('abcd,abc->abcd', a, b)))
     # print(np.pad([1,2,3], (0, 10 - len([1,2,3])), 'constant'))
     pass

@@ -3,10 +3,12 @@ import data_provider
 from E2E_model import E2EModel
 import logger
 import numpy as np
+from logger import timer
 
-class AttnNet(E2EModel):
-    def __init__(self, task_num, data_form=2):
-        super(AttnNet, self).__init__(task_num, data_form)
+
+class AttnNet_1(E2EModel):
+    def __init__(self, task_num, data_form=1):
+        super(AttnNet_1, self).__init__(task_num, data_form)
         self.hidden_unit_num = 2048
         self.output_dim = 20
 
@@ -66,31 +68,42 @@ class AttnNet(E2EModel):
         return output
 
     def attention_network(self, x, keep_prob):
+        """
+        scaled dot-product attention
+        :param x: [batch_size, seq_len, feature_dim] e.g. [1000, 180, 300]
+        :param keep_prob:
+        :return:
+        """
 
         attn_out_1 = self.add_and_norm(x, self.self_attention(x, keep_prob=keep_prob))
         ff_out_1 = self.add_and_norm(attn_out_1, self.feed_forward(attn_out_1, 1, keep_prob=keep_prob))
+        # pool_output = tf.layers.average_pooling1d(ff_out_1, 2, 2)
+        output = tf.layers.dense(tf.reshape(ff_out_1, [-1, 15*300]), 512, tf.nn.relu)
+        return output
 
-        hidden_1 = tf.layers.dense(tf.reshape(ff_out_1, [-1, 180*300]), 512, tf.nn.relu)
-        # hidden_2 = tf.layers.dense(hidden_1, 256, tf.nn.relu)
-        # hidden = self.attention_layer(hidden, attn_output_dim=2048)
-        logits = tf.layers.dense(hidden_1, self.output_dim, name='logits')
-
-        return logits
-
-    def train(self, epochs, exp_name, lr=1e-3, keep_prob=1.0, save_model=False, mask_state=False):
+    def train(self, epochs, exp_name, lr=1e-3, keep_prob=1.0, save_model=False, mask_state=True):
 
         # inputs & outputs format
-        x = tf.placeholder(tf.int32, [None, 180], name='x')
+        x = tf.placeholder(tf.int32, [None, 25, 30], name='x')
         y = tf.placeholder('float', [None, self.output_dim], name='y')
         dropout_rate = tf.placeholder('float', [])
         mask = tf.placeholder(tf.float32, [None, 25, 30])
 
         # construct computation graph
-        embed_x = self.embedding_layer(x)  # shape [Batch_size, 180, 300]
+        single_self_attn_output = []
+        for utterance_num in range(25):
+            with tf.variable_scope('self_attention_{0}'.format(utterance_num)):
+                embed_x = self.embedding_layer(x[:, utterance_num, :])
+                if mask_state:
+                    masked_embed = tf.einsum('abc,ab->abc', embed_x, mask[:, utterance_num, :])
+                else:
+                    masked_embed = embed_x
+                pe_x = (self.apply_positional_encoding(tf.reshape(masked_embed, [-1, 30, 300]), length=30, hidden_size=300))
+                single_self_attn_output.append(self.attention_network(pe_x, keep_prob=dropout_rate))  # [batch_size,512]
 
-        pe_x = self.apply_positional_encoding(tf.reshape(embed_x, [-1, 180, 300]), length=180, hidden_size=300)
-
-        logits = self.attention_network(pe_x, keep_prob=dropout_rate)
+        context = tf.concat(single_self_attn_output, 1)
+        hidden = tf.layers.dense(context, 1024, tf.nn.relu)
+        logits = tf.layers.dense(hidden, self.output_dim)
         loss = self.compute_loss(logits, y)
 
         accuracy = self.compute_accuracy(logits, y)
@@ -106,21 +119,29 @@ class AttnNet(E2EModel):
             log_saver.set_log_cate(self.task_num)
 
             # train
-            all_one_mask = np.ones([1000, 180])
+            all_one_mask = np.ones([1000, 25, 30])
 
             for epoch in range(epochs):
-                for i in range(int(8000/1000)):
-                    batch_x, batch_y, batch_mask = self.train_set.next_batch(1000)
+                for i in range(int(8000/100)):
+                    batch_x, batch_y, batch_mask = self.train_set.next_batch(100)
                     if mask_state:
                         sess.run(train_op, feed_dict={x: batch_x, y: batch_y,
                                                       dropout_rate: keep_prob, mask: batch_mask})
                     else:
                         sess.run(train_op, feed_dict={x: batch_x, y: batch_y,
-                                                      dropout_rate: keep_prob})
+                                                      dropout_rate: keep_prob, mask: all_one_mask})
                     # print validation information every 40 iteration (half epoch)
-                    if i % 4 == 0 and i != 0:
-                        train_loss = loss.eval(feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob, mask: batch_mask})
-                        train_acc = accuracy.eval(feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob, mask: batch_mask})
+                    if i % 40 == 0 and i != 0:
+                        if mask_state:
+                            train_loss = loss.eval(
+                                feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob, mask: batch_mask})
+                            train_acc = accuracy.eval(
+                                feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob, mask: batch_mask})
+                        else:
+                            train_loss = loss.eval(
+                                feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob, mask: all_one_mask})
+                            train_acc = accuracy.eval(
+                                feed_dict={x: batch_x, y: batch_y, dropout_rate: keep_prob, mask: all_one_mask})
 
                         val_x, val_y, _ = self.val_set.next_batch(1000)
                         val_acc = accuracy.eval(feed_dict={
@@ -156,8 +177,9 @@ class AttnNet(E2EModel):
 if __name__ == '__main__':
     # DATA_PATH = '/afs/inf.ed.ac.uk/user/s17/s1700619/E2E_dialog/dataset'
     #
-    model = AttnNet(1, 2)
-    tf.print_function(model.length())
+    model = AttnNet_1(1)
+    model.train(10, 'test')
+    # tf.print_function(model.length())
     # model.train(100, 'test_save_model')
     pass
 
