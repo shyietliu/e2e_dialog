@@ -46,19 +46,27 @@ class LSTM(E2EModel):
 
         lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.lstm_hidden_unit_num, forget_bias=1, activation=tf.nn.relu)
 
-        lstm_outputs, last_state = tf.nn.dynamic_rnn(lstm_cell, x, dtype="float32", sequence_length=self.length(x))
+        lstm_outputs, last_state = tf.nn.dynamic_rnn(lstm_cell, x,
+                                                     dtype="float32", sequence_length=self.length(x))
 
+        print(lstm_outputs)
         if self.attn_usage:
-            output = self.attention_layer(lstm_outputs, attn_output_dim=1024)
+            # output = self.attention_layer(lstm_outputs, attn_output_dim=1024)
+            align_matrix = tf.matmul(lstm_outputs, tf.einsum('ijk->ikj', lstm_outputs))
+            # print(align_matrix)
+            # align_vector = tf.reduce_sum(align_matrix, 1)
+            alignment = tf.nn.softmax(align_matrix / 30, 0)
+            print(alignment)
+            # context = tf.einsum('btk,bt->bk', lstm_outputs, alignment)
+            context = tf.matmul(alignment, lstm_outputs)
+            print(context)
+            context = tf.reshape(context, [-1, 180*self.lstm_hidden_unit_num])
+            context = tf.layers.dense(context, 1024, tf.nn.relu)
+
         else:
-            output = tf.layers.dense(last_state.h, 256, tf.nn.relu)
+            context = tf.layers.dense(last_state.h, 256, tf.nn.relu)
 
-        logits = tf.layers.dense(output, self.output_dim)
-
-        # fc_inputs = tf.reshape(lstm_outputs, [-1, 160*self.lstm_hidden_unit_num])
-        # fc_outputs = tf.layers.dense(fc_inputs, 1024, tf.nn.relu)
-        #
-        # logits = tf.layers.dense(fc_outputs, self.output_dim)
+        logits = tf.layers.dense(context, self.output_dim)
 
         return logits
 
@@ -89,7 +97,7 @@ class LSTM(E2EModel):
             sess.run(init)
 
             # ini logger
-            log_saver = logger.LogSaver(exp_name)
+            log_saver = logger.LogSaver(exp_name+'lr_{0}_epoch_{1}'.format(lr, epochs))
             log_saver.set_log_cate(self.task_num)
 
             # train

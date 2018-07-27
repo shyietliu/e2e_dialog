@@ -8,7 +8,7 @@ def timer(func):
         start_time = time.time()
         func(*arg, **kwargs)
         end_time = time.time()
-        print('running time {0:f}'.format(end_time-start_time))
+        print(str(func.__name__)+' running time {0:f}'.format(end_time-start_time))
 
     return wrapper
 

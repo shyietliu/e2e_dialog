@@ -168,14 +168,21 @@ class E2EModel(object):
         :return: outputs of attention layer
         """
 
-        align_matrix = tf.matmul(tf.einsum('ijk->ikj', x), x)
-        alignment = tf.nn.softmax(align_matrix, 0)
-        context_vector = tf.matmul(x, alignment)
-        attention_output = tf.layers.dense(tf.reshape(context_vector, [-1, 180 * 256]),  # was 160*128
-                                           attn_output_dim,
-                                           activation=tf.nn.tanh)
+        # align_matrix = tf.matmul(tf.einsum('ijk->ikj', x), x)
+        # alignment = tf.nn.softmax(align_matrix / 30, 0)
+        # context_vector = tf.matmul(x, alignment)
+        # x_shape = x.get_shape().as_list()
+        # attention_output = tf.layers.dense(tf.reshape(context_vector, [-1, x_shape[1] * x_shape[2]]),  # was 180*256
+        #                                    attn_output_dim,
+        #                                    activation=tf.nn.tanh)
 
-        return attention_output
+        align_matrix = tf.matmul(x, tf.einsum('ijk->ikj', x))
+        # align_vector = tf.reduce_sum(align_matrix, 1)
+        alignment = tf.nn.softmax(align_matrix / 30, 0)
+        context = tf.matmul(alignment, x)
+        # context = tf.einsum('btk,bt->bk', x, alignment)
+
+        return context
 
 
 if __name__ == '__main__':

@@ -22,12 +22,8 @@ class AttnNet_1(E2EModel):
         """
 
         align_matrix = tf.matmul(tf.einsum('ijk->ikj', x), x)
-        alignment = tf.nn.softmax(align_matrix, 0)
+        alignment = tf.nn.softmax(align_matrix / 30, 0)
         context_vector = tf.matmul(x, alignment)
-
-        # align_matrix = tf.matmul(x, tf.einsum('ijk->ikj', x))
-        # alignment = tf.nn.softmax(align_matrix/30, 0)
-        # context_vector = tf.matmul(alignment, x)
 
         return tf.nn.dropout(context_vector, keep_prob=keep_prob)
 

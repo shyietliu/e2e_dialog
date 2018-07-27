@@ -12,21 +12,26 @@ class LSTM(E2EModel):
         self.output_dim = 8
         self.path = data_path
 
-    def lstm_predictor(self, x):
+    def lstm_predictor(self, x, lstm_hidden_unit_num, output_dim):
+        """
 
-        lstm_cell = tf.contrib.rnn.BasicLSTMCell(self.lstm_hidden_unit_num, forget_bias=1, activation=tf.nn.relu)
+        :param x: [batch_size, seq_len, feature_dim]
+        :return: logits
+        """
+
+        # x_shape = x.get_shape().as_list()
+
+        lstm_cell = tf.contrib.rnn.BasicLSTMCell(lstm_hidden_unit_num, forget_bias=1, activation=tf.nn.relu)
 
         lstm_outputs, last_state = tf.nn.dynamic_rnn(lstm_cell, x, dtype="float32", sequence_length=self.length(x))
 
-        fc_inputs = tf.reshape(lstm_outputs, [-1, 160*self.lstm_hidden_unit_num])
-        fc_outputs = tf.layers.dense(fc_inputs, 1024, tf.nn.relu)
-        # ff_inputs = last_state.h
-        # #
-        # ff_outputs = tf.layers.dense(ff_inputs, 512, tf.nn.relu)
+        # fc_inputs = tf.reshape(lstm_outputs, [-1, x_shape[1]*lstm_hidden_unit_num])
+        #
+        # fc_outputs = tf.layers.dense(fc_inputs, 1024, tf.nn.relu)
 
-        logits = tf.layers.dense(fc_outputs, self.output_dim)
+        # logits = tf.layers.dense(fc_outputs, output_dim)
 
-        return logits
+        return last_state.h
 
     def train(self, train_epoch, exp_name, lr):
 

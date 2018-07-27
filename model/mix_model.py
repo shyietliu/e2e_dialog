@@ -7,9 +7,9 @@ from logger import timer
 import time
 
 
-class AttnNet_1(E2EModel):
+class MixModel(E2EModel):
     def __init__(self, task_num, data_form=1):
-        super(AttnNet_1, self).__init__(task_num, data_form)
+        super(MixModel, self).__init__(task_num, data_form)
         self.hidden_unit_num = 2048
         self.output_dim = 20
 
@@ -20,14 +20,9 @@ class AttnNet_1(E2EModel):
         :param x: input with shape [batch_size, sequence_len, embedding_dim] e.g. [100, 180, 300]
         :return: self-attention output with the same shape with input 'x'
         """
-
         align_matrix = tf.matmul(tf.einsum('ijk->ikj', x), x)
         alignment = tf.nn.softmax(align_matrix, 0)
         context_vector = tf.matmul(x, alignment)
-
-        # align_matrix = tf.matmul(x, tf.einsum('ijk->ikj', x))
-        # alignment = tf.nn.softmax(align_matrix/30, 0)
-        # context_vector = tf.matmul(alignment, x)
 
         return tf.nn.dropout(context_vector, keep_prob=keep_prob)
 
@@ -35,17 +30,13 @@ class AttnNet_1(E2EModel):
     def feed_forward(x, layer_num, keep_prob):
         """
 
-        :param x: input for feed forward layer. with shape [batch_size, sequence_len, feature_dim]
+        :param x: input for feed forward layer.
         :param layer_num: the number of this feed forward layer
         :return:
         """
-        x_shape = x.get_shape().as_list()
-        print('!'*20)
-        print(x_shape)
-
         # map to higher dim
         ff_weight_first = tf.get_variable('ff_weight_first_{0}'.format(layer_num),
-                                          shape=[x_shape[2], 2000],
+                                          shape=[300, 2000],
                                           initializer=tf.contrib.layers.xavier_initializer())
         ff_bias_first = tf.get_variable('ff_bias_first_{0}'.format(layer_num),
                                         shape=[2000],
@@ -55,10 +46,10 @@ class AttnNet_1(E2EModel):
 
         # map to lower dim
         ff_weight_second = tf.get_variable('ff_weight_second_{0}'.format(layer_num),
-                                           shape=[2000, x_shape[2]],
+                                           shape=[2000, 300],
                                            initializer=tf.contrib.layers.xavier_initializer())
         ff_bias_second = tf.get_variable('ff_bias_second_{0}'.format(layer_num),
-                                         shape=[x_shape[2]],
+                                         shape=[300],
                                          initializer=tf.contrib.layers.xavier_initializer())
 
         output2 = tf.nn.relu(tf.einsum('abc,cd->abd', output1, ff_weight_second)+ff_bias_second)
@@ -77,24 +68,18 @@ class AttnNet_1(E2EModel):
         output = normed_x + x
         return output
 
-    def attention_network(self, x, keep_prob, seq_len=30, output_dim=512):
+    def attention_network(self, x, keep_prob):
         """
-        complete self-attention layer
+        scaled dot-product attention
         :param x: [batch_size, seq_len, feature_dim] e.g. [1000, 180, 300]
         :param keep_prob:
         :return:
         """
-        x_shape = x.get_shape().as_list()
 
         attn_out_1 = self.add_and_norm(x, self.self_attention(x, keep_prob=keep_prob))
         ff_out_1 = self.add_and_norm(attn_out_1, self.feed_forward(attn_out_1, 1, keep_prob=keep_prob))
-        print('-' * 20)
-        print(ff_out_1)
-        # attn_out_2 = self.add_and_norm(ff_out_1, self.self_attention(ff_out_1, keep_prob=keep_prob))
-        # ff_out_2 = self.add_and_norm(attn_out_2, self.feed_forward(attn_out_2, 2, keep_prob=keep_prob))
         # pool_output = tf.layers.average_pooling1d(ff_out_1, 2, 2)
-        output = tf.layers.dense(tf.reshape(ff_out_1, [-1, seq_len*x_shape[2]]), output_dim, tf.nn.relu)
-
+        output = tf.layers.dense(tf.reshape(ff_out_1, [-1, 30*300]), 512, tf.nn.relu)
         return output
 
     def train(self, epochs, exp_name, lr=1e-3, keep_prob=1.0, save_model=False, mask_input=0):
@@ -104,6 +89,7 @@ class AttnNet_1(E2EModel):
         y = tf.placeholder('float', [None, self.output_dim], name='y')
         dropout_rate = tf.placeholder('float', [])
         mask = tf.placeholder(tf.float32, [None, 25, 30])
+
         # construct computation graph
         single_self_attn_output = []
         for utterance_num in range(25):
@@ -114,16 +100,22 @@ class AttnNet_1(E2EModel):
                 else:
                     masked_embed = embed_x
                 pe_x = (self.apply_positional_encoding(tf.reshape(masked_embed, [-1, 30, 300]), length=30, hidden_size=300))
+                # sentence_embedding = tf.reshape(self.attention_network(pe_x, keep_prob=dropout_rate), [-1, 30*300])
+                # sentence_embedding = tf.layers.dense(sentence_embedding, 1024, tf.nn.relu)
                 single_self_attn_output.append(self.attention_network(pe_x, keep_prob=dropout_rate))  # [batch_size,512]
 
-        context = tf.concat(single_self_attn_output, 1)
-        # sentence_representation = tf.reshape(single_self_attn_output, [-1, 25, 512])  # [batch_size, 25, 512]
-        #
-        # print(sentence_representation)
-        # context = self.attention_network(sentence_representation, keep_prob=dropout_rate, output_dim=1024, seq_len=25)
+        lstm_inputs = tf.reshape(single_self_attn_output, [-1, 25, 512])
+        lstm_cell = tf.contrib.rnn.BasicLSTMCell(512,
+                                                 forget_bias=1,
+                                                 activation=tf.nn.relu)
 
-        hidden = tf.layers.dense(context, 1024, tf.nn.relu)
+        lstm_outputs, last_state = tf.nn.dynamic_rnn(lstm_cell, lstm_inputs, dtype="float32",
+                                                     sequence_length=self.length(lstm_inputs))
+
+        # context = tf.concat(single_self_attn_output, 1)
+        hidden = tf.layers.dense(last_state.h, 1024, tf.nn.relu)
         logits = tf.layers.dense(hidden, self.output_dim)
+
         loss = self.compute_loss(logits, y)
 
         accuracy = self.compute_accuracy(logits, y)
